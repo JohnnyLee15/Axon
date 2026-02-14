@@ -1,0 +1,8 @@
+services:
+  axon:
+    build: .
+    volumes:
+      - .:/app
+    tty: true
+    stdin_open: true
+    command: sleep infinity

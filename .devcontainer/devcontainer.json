@@ -1,0 +1,14 @@
+{
+    "name": "Axon-dev",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "axon",
+    "workspaceFolder": "/app",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ]
+        }
+    }
+}
