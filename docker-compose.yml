@@ -1,6 +1,8 @@
 services:
   axon:
     build: .
+    env_file:
+      - .env
     volumes:
       - .:/app
     tty: true
