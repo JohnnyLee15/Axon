@@ -1,2 +1,2 @@
-pymupdf
 groq
+docling

@@ -1,31 +1,20 @@
+import fitz
 import re
 import os
 import json
 from groq import Groq
-from docling.document_converter import DocumentConverter
-from docling_core.transforms.serializer.markdown import MarkdownDocSerializer
-from docling.datamodel.base_models import DocItemLabel
 
 class pdf_parser:
     # Constants
+    HEADER_RATIO = 0.08
+    FOOTER_RATIO = 0.95
+    FOOTER_RATIO_LLM = 0.90
+    SIDEBAR_RATIO = 0.90
+    COLUMN_TOLERANCE_RATIO = 0.02
+    BLOCK_WORD_CUTOFF = 10
     BLOCK_WORD_CUTOFF_LLM = 15
+    NARROW_WIDTH_RATIO = 0.20
     MAX_CHARS_LLM = 4000
-    IS_FLUFF = 0
-
-    TABLE_ITEM = "TableItem"
-
-    NOISE_LABELS = {
-        DocItemLabel.PAGE_HEADER,
-        DocItemLabel.PAGE_FOOTER,
-        DocItemLabel.DOCUMENT_INDEX,
-        DocItemLabel.CHECKBOX_SELECTED,
-        DocItemLabel.CHECKBOX_UNSELECTED,
-        DocItemLabel.FORM,
-        DocItemLabel.GRADING_SCALE,
-        DocItemLabel.HANDWRITTEN_TEXT,
-        DocItemLabel.REFERENCE,
-        DocItemLabel.PICTURE
-    }
 
     CORE_HEADERS = {
         "abstract", "introduction", "background", "objectives", "aims",
@@ -92,81 +81,94 @@ class pdf_parser:
     def __init__(self):
         self.model = "llama-3.3-70b-versatile"
         self.client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-        self.converter = DocumentConverter()
 
-    def is_potentially_fluff(self, text):
+    def is_fluff(self, block, pw, ph):
+        x0, y0, _, y1, text, _, _ = block
+
+        if y1 < (self.HEADER_RATIO * ph):
+            return True
+        if y0 > (self.FOOTER_RATIO * ph):
+            return True
+        if x0 > (self.SIDEBAR_RATIO * pw):
+            return True
+
+        words = text.split()
+        if len(words) <= self.BLOCK_WORD_CUTOFF:
+            clean_text = re.sub(r'^[\d\.\s]+', '', text).strip().lower()
+            if clean_text in self.CORE_HEADERS:
+                return False
+
+            for word in words:
+                clean_word = re.sub(r'[^\w]', '', word).lower()
+                if clean_word in self.CORE_HEADERS:
+                    return False
+
+            return True
+        return False
+
+    def is_potentially_fluff(self, block, pw, ph):
+        x0, y0, x1, y1, text, _, _ = block
+        if y0 > (ph * self.FOOTER_RATIO_LLM):
+            return True
+
+        bw = x1 - x0
+        bh = y1 - y0
+        if bw < (self.NARROW_WIDTH_RATIO * pw):
+            return True
+
         text_lower = text.strip().lower()
-
-        clean_text = text_lower.replace('#', '').strip()
-        if clean_text in self.CORE_HEADERS:
-            return False
-
         for pattern in self.FLUFF_PATTERNS:
             if re.search(pattern, text_lower):
                 return True
 
         words = text_lower.split()
+
         if len(words) <= self.BLOCK_WORD_CUTOFF_LLM:
             return True
 
         return False
 
+    def sort_blocks(self, blocks, pw):
+        blocks.sort(key=lambda b: b[0])
+        groups = []
+
+        for b in blocks:
+            if not groups:
+                groups.append([b])
+                continue
+
+            x0 = b[0]
+            group_x0 = groups[-1][0][0]
+            if abs(x0 - group_x0) <= (self.COLUMN_TOLERANCE_RATIO * pw):
+                groups[-1].append(b)
+            else:
+                groups.append([b])
+
+        for g in groups:
+            g.sort(key=lambda b: b[1])
+
+        groups.sort(key=lambda g : g[0][0])
+        return [b for g in groups for b in g]
+
     def get_pdf_blocks(self, filepath):
         block_reg = {}
         curr_bid = 0
-        doc = self.converter.convert(filepath).document
-        seen_content = set()
-        for item, level in doc.iterate_items():
-            if item.label in self.NOISE_LABELS:
-                continue
-
-            item_type = type(item).__name__
-            text = ""
-            md_content = ""
-
-            if item_type == self.TABLE_ITEM:
-                text = item.export_to_markdown(doc=doc).strip()
-                md_content = text
-
-
-            elif hasattr(item, "text"):
-                text = item.text.strip()
-                if not text:
-                    continue
-
-                text = re.sub(r'([A-Za-z]+)-\s*\n\s*([a-z]+)', r'\1\2', text)
-
-                if item.label == DocItemLabel.SECTION_HEADER:
-                    md_content = f"{'#' * max(1, level)} {text}"
-                elif item.label == DocItemLabel.LIST_ITEM:
-                    md_content = f"* {text}"
-                else:
-                    md_content = text
-            else:
-                continue
-
-            if not text or not any(char.isalnum() for char in text) or text == "":
-                continue
-
-            content_hash = hash(text)
-            if content_hash in seen_content:
-                continue
-            seen_content.add(content_hash)
-
-            page_numbers = []
-            if hasattr(item, "prov") and item.prov:
-                page_numbers = list(set(p.page_no for p in item.prov if hasattr(p, "page_no")))
-
-            block_reg[curr_bid] = {
-                "text": text,
-                "markdown": md_content,
-                "label": item.label.name,
-                "item_type": item_type,
-                "page_numbers": page_numbers,
-                "is_fluff_risk": self.is_potentially_fluff(text),
-                "level": level
-            }
-            curr_bid += 1
+        with fitz.open(filepath) as doc:
+            for page in doc:
+                pw = page.rect.width
+                ph = page.rect.height
+                blocks = page.get_text(option="blocks")
+                blocks = self.sort_blocks(blocks, pw)
+                blocks = [b for b in blocks if not self.is_fluff(b, pw, ph)]
+                for b in blocks:
+                    x0, y0, x1, y1, text, block_no, block_type = b
+                    text = re.sub(r'([A-Za-z]+)-\s*\n\s*([a-z]+)', r'\1\2', text)
+                    b = (x0, y0, x1, y1, text, block_no, block_type)
+                    block_reg[curr_bid] = {
+                        "block": b,
+                        "is_fluff": self.is_potentially_fluff(b, pw, ph)
+                    }
+                    curr_bid += 1
 
         return block_reg
 
@@ -190,39 +192,38 @@ class pdf_parser:
         except Exception as e:
             return {}
 
-    def get_blocks_to_remove(self, batch_text):
-        results = self.call_llm(batch_text)
-        return [int(bid) for bid in results if results[bid] == self.IS_FLUFF]
-
 
     def remove_fluff_blocks(self, blocks_reg):
-        fluff_bids = [b for b in blocks_reg if blocks_reg[b]["is_fluff_risk"]]
+        fluff_bids = [b for b in blocks_reg if blocks_reg[b]["is_fluff"]]
         if not fluff_bids:
             return blocks_reg
 
         current_batch_text = ""
         bids_to_remove = []
         for bid in fluff_bids:
-            block_text = blocks_reg[bid]["text"]
+            block_text = blocks_reg[bid]["block"][4]
             entry = f"\n=============\n"
             entry += f"[BID: {bid}]\n"
             entry += f"{block_text}\n"
 
             if len(current_batch_text) + len(entry) > self.MAX_CHARS_LLM:
-                bids_to_remove.extend(self.get_blocks_to_remove(current_batch_text))
+                results = self.call_llm(current_batch_text)
+                bids_to_remove.extend(int(bid) for bid in results if results[bid] == 0)
                 current_batch_text = ""
 
             current_batch_text += entry
 
         if current_batch_text:
-            bids_to_remove.extend(self.get_blocks_to_remove(current_batch_text))
+            results = self.call_llm(current_batch_text)
+            bids_to_remove.extend(int(bid) for bid in results if results[bid] == 0)
 
         clean_reg = {}
         for b in blocks_reg:
             if b not in bids_to_remove:
-                clean_reg[b] = blocks_reg[b]
+                clean_reg[b] = blocks_reg[b]["block"]
 
         return clean_reg
+
 
 if __name__ == "__main__":
     parser = pdf_parser()
@@ -230,10 +231,8 @@ if __name__ == "__main__":
     blocks = parser.remove_fluff_blocks(blocks)
 
     for b in blocks:
-        print("\n---")
-        print(f"**[BID: {b}]**")
-        print(blocks[b]["markdown"])
-        print("---\n")
+        print(f"\n[BID: {b}]")
+        print(blocks[b][4])
 
 
 

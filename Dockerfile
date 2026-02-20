@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Install system deps
 RUN apt-get update && apt-get install -y \
-    poppler-utils \
+    libgl1 libglib2.0-0 \
     git \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
