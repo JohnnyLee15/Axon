@@ -3,128 +3,46 @@ import os
 import json
 from groq import Groq
 from docling.document_converter import DocumentConverter
-from docling_core.transforms.serializer.markdown import MarkdownDocSerializer
 from docling.datamodel.base_models import DocItemLabel
+import config
 
-class pdf_parser:
-    # Constants
-    BLOCK_WORD_CUTOFF_LLM = 15
-    MAX_CHARS_LLM = 4000
-    IS_FLUFF = 0
-
-    TABLE_ITEM = "TableItem"
-
-    NOISE_LABELS = {
-        DocItemLabel.PAGE_HEADER,
-        DocItemLabel.PAGE_FOOTER,
-        DocItemLabel.DOCUMENT_INDEX,
-        DocItemLabel.CHECKBOX_SELECTED,
-        DocItemLabel.CHECKBOX_UNSELECTED,
-        DocItemLabel.FORM,
-        DocItemLabel.GRADING_SCALE,
-        DocItemLabel.HANDWRITTEN_TEXT,
-        DocItemLabel.REFERENCE,
-        DocItemLabel.PICTURE
-    }
-
-    CORE_HEADERS = {
-        "abstract", "introduction", "background", "objectives", "aims",
-        "methods", "methodology", "materials and methods",
-        "experimental procedures", "study design", "results", "findings",
-        "discussion", "conclusion", "conclusions", "summary"
-    }
-
-    FLUFF_PATTERNS = [
-        r'downloaded\s+from',
-        r'https?://\S+',
-        r'doi:?\s*10\.',
-        r'vol(ume)?\.?\s*\d+',
-        r'no\.?\s*\d+',
-        r'pp\.?\s*\d+',
-        r'©', r'copyright',
-        r'all rights reserved',
-        r'received\s+\d+',
-        r'accepted\s+\d+',
-        r'published\s+online',
-        r'email:', r'correspondence:',
-        r'issn\s+\d+',
-        r'keywords\.',
-    ]
-
-    SYSTEM_PROMPT = """
-        You are a Data Curation Expert for a Scientific RAG (Retrieval-Augmented Generation) pipeline.
-        Your task is to classify text blocks extracted from PDF research papers as either "Signal" (Keep) or "Noise" (Remove).
-
-        The input contains text blocks marked with IDs (e.g., [BID: 12]).
-        You must output a JSON object mapping the BID to a binary flag:
-        - 1 (KEEP): Valid content.
-        - 0 (REMOVE): Fluff/Noise.
-
-        ### CRITERIA FOR CLASSIFICATION
-
-        **MARK AS 1 (KEEP - Signal):**
-        1. **Section Headers:** Any standard scientific header (e.g., "Abstract", "Introduction", "Results", "Methods", "Conclusion", "References", "Funding"). **CRITICAL: Do not remove headers.**
-        2. **Body Text:** Sentences or paragraphs that look like part of the scientific narrative (even if short).
-        3. **Figure/Table Captions:** Text describing a figure or table (e.g., "Figure 1: Correlation between...").
-        4. **Formulas/Data:** Mathematical equations or specific data points integral to the paper.
-
-        **MARK AS 0 (REMOVE - Noise):**
-        1. **Running Headers/Footers:** Journal names, page numbers (e.g., "Page 1 of 5"), dates, or repeated titles at the top/bottom of pages.
-        2. **Metadata artifacts:** "Downloaded from...", DOIs, URLs, "Copyright © 2024", "All rights reserved".
-        3. **Correspondence info:** Author emails, fax numbers, or address blocks (unless part of the main text body).
-        4. **Navigation garbage:** "Back to top", "Next page", or isolated random symbols.
-        5. **References/Bibliography:** The list of citations at the end of the paper. (Note: Keep the "References" header itself if you want to know where it starts, but remove the list items).
-
-        ### INPUT FORMAT
-        Each block is separated by "=============".
-        [BID: <integer>]
-        <text content>
-
-        ### OUTPUT FORMAT
-        Return ONLY a valid JSON object. Do not include markdown formatting or explanations.
-        Example:
-        {
-            "12": 0,
-            "45": 1
-        }
-        """
-
+class PdfParser:
     def __init__(self):
         self.model = "llama-3.3-70b-versatile"
         self.client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
         self.converter = DocumentConverter()
 
-    def is_potentially_fluff(self, text):
+    def is_potentially_noise(self, text):
         text_lower = text.strip().lower()
 
         clean_text = text_lower.replace('#', '').strip()
-        if clean_text in self.CORE_HEADERS:
+        if clean_text in config.SCIENTIFIC_HEADERS:
             return False
 
-        for pattern in self.FLUFF_PATTERNS:
+        for pattern in config.NOISE_REGEX_PATTERNS:
             if re.search(pattern, text_lower):
                 return True
 
         words = text_lower.split()
-        if len(words) <= self.BLOCK_WORD_CUTOFF_LLM:
+        if len(words) <= config.MIN_WORD_COUNT_THRESHOLD:
             return True
 
         return False
 
-    def get_pdf_blocks(self, filepath):
+    def extract_blocks(self, filepath):
         block_reg = {}
         curr_bid = 0
         doc = self.converter.convert(filepath).document
         seen_content = set()
         for item, level in doc.iterate_items():
-            if item.label in self.NOISE_LABELS:
+            if item.label in config.EXCLUDED_DOCLING_LABELS:
                 continue
 
             item_type = type(item).__name__
             text = ""
             md_content = ""
 
-            if item_type == self.TABLE_ITEM:
+            if item_type == "TableItem":
                 text = item.export_to_markdown(doc=doc).strip()
                 md_content = text
 
@@ -163,7 +81,7 @@ class pdf_parser:
                 "label": item.label.name,
                 "item_type": item_type,
                 "page_numbers": page_numbers,
-                "is_fluff_risk": self.is_potentially_fluff(text),
+                "is_noise_risk": self.is_potentially_noise(text),
                 "level": level
             }
             curr_bid += 1
@@ -175,7 +93,7 @@ class pdf_parser:
         try:
             chat_completion = self.client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "system", "content": config.LLM_CURATION_PROMPT},
                     {"role": "user", "content": user_prompt}
                 ],
                 model = self.model,
@@ -190,13 +108,13 @@ class pdf_parser:
         except Exception as e:
             return {}
 
-    def get_blocks_to_remove(self, batch_text):
+    def get_noise_blocks(self, batch_text):
         results = self.call_llm(batch_text)
-        return [int(bid) for bid in results if results[bid] == self.IS_FLUFF]
+        return [int(bid) for bid in results if results[bid] == config.REMOVE_FLAG]
 
 
-    def remove_fluff_blocks(self, blocks_reg):
-        fluff_bids = [b for b in blocks_reg if blocks_reg[b]["is_fluff_risk"]]
+    def remove_noise_blocks(self, blocks_reg):
+        fluff_bids = [b for b in blocks_reg if blocks_reg[b]["is_noise_risk"]]
         if not fluff_bids:
             return blocks_reg
 
@@ -208,14 +126,14 @@ class pdf_parser:
             entry += f"[BID: {bid}]\n"
             entry += f"{block_text}\n"
 
-            if len(current_batch_text) + len(entry) > self.MAX_CHARS_LLM:
-                bids_to_remove.extend(self.get_blocks_to_remove(current_batch_text))
+            if len(current_batch_text) + len(entry) > config.LLM_BATCH_CHAR_LIMIT:
+                bids_to_remove.extend(self.get_noise_blocks(current_batch_text))
                 current_batch_text = ""
 
             current_batch_text += entry
 
         if current_batch_text:
-            bids_to_remove.extend(self.get_blocks_to_remove(current_batch_text))
+            bids_to_remove.extend(self.get_noise_blocks(current_batch_text))
 
         clean_reg = {}
         for b in blocks_reg:
@@ -225,9 +143,9 @@ class pdf_parser:
         return clean_reg
 
 if __name__ == "__main__":
-    parser = pdf_parser()
-    blocks = parser.get_pdf_blocks("test_pdfs/jiy114.pdf")
-    blocks = parser.remove_fluff_blocks(blocks)
+    parser = PdfParser()
+    blocks = parser.extract_blocks("test_pdfs/jiy114.pdf")
+    blocks = parser.remove_noise_blocks(blocks)
 
     for b in blocks:
         print("\n---")
