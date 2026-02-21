@@ -2,8 +2,9 @@
 Contains constants needed for python files within the src directory
 """
 from docling.datamodel.base_models import DocItemLabel
+import re
 
-# ------ Constants for pdf_parser.py ------
+# ------ Block Processing Constants ------
 
 # Blocks under this count trigger an LLM review
 MIN_WORD_COUNT_THRESHOLD = 15
@@ -11,10 +12,18 @@ MIN_WORD_COUNT_THRESHOLD = 15
 # Maximum characters per Groq API request
 LLM_BATCH_CHAR_LIMIT = 4000
 
+LLM_CURATION_MODEL = "llama-3.3-70b-versatile"
+LLM_CURATION_MODEL_TEMPERATURE = 0.0
+GROQ_API_KEY = "GROQ_API_KEY"
+
+HYPHEN_WRAP_PATTERN = re.compile(r'([A-Za-z]+)-\s*\n\s*([a-z]+)')
+CODE_BLOCK_PATTERN = re.compile(r'```(?:json)?\n?|```')
+
 # JSON flag from LLM indicating a block should be deleted
 REMOVE_FLAG = 0
 
-# Labels to exclude when extracting from a PDF
+# ------ Docling Parser Configurations ------
+
 EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PAGE_HEADER,
     DocItemLabel.PAGE_FOOTER,
@@ -28,7 +37,6 @@ EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PICTURE
 }
 
-# Headers to keep when extracting from a PDF
 SCIENTIFIC_HEADERS = {
     "abstract", "introduction", "background", "objectives", "aims",
     "methods", "methodology", "materials and methods",
@@ -36,25 +44,27 @@ SCIENTIFIC_HEADERS = {
     "discussion", "conclusion", "conclusions", "summary"
 }
 
-# Regex patterns indicating likely watermarks, metadata, or noise
 NOISE_REGEX_PATTERNS = [
-    r'downloaded\s+from',
-    r'https?://\S+',
-    r'doi:?\s*10\.',
-    r'vol(ume)?\.?\s*\d+',
-    r'no\.?\s*\d+',
-    r'pp\.?\s*\d+',
-    r'©', r'copyright',
-    r'all rights reserved',
-    r'received\s+\d+',
-    r'accepted\s+\d+',
-    r'published\s+online',
-    r'email:', r'correspondence:',
-    r'issn\s+\d+',
-    r'keywords\.',
+    re.compile(r'downloaded\s+from'),
+    re.compile(r'https?://\S+'),
+    re.compile(r'doi:?\s*10\.'),
+    re.compile(r'vol(ume)?\.?\s*\d+'),
+    re.compile(r'no\.?\s*\d+'),
+    re.compile(r'pp\.?\s*\d+'),
+    re.compile(r'©'),
+    re.compile(r'copyright'),
+    re.compile(r'all rights reserved'),
+    re.compile(r'received\s+\d+'),
+    re.compile(r'accepted\s+\d+'),
+    re.compile(r'published\s+online'),
+    re.compile(r'email:'),
+    re.compile(r'correspondence:'),
+    re.compile(r'issn\s+\d+'),
+    re.compile(r'keywords\.'),
 ]
 
-# LLM instructions for classifying extracted text blocks
+# ------ LLM Prompts ------
+
 LLM_CURATION_PROMPT = """
 You are a Data Curation Expert for a Scientific RAG (Retrieval-Augmented Generation) pipeline.
 Your task is to classify text blocks extracted from PDF research papers as either "Signal" (Keep) or "Noise" (Remove).
