@@ -1,11 +1,20 @@
 import os
 import json
+import logging
+
+# Suppress logging
+logging.disable(logging.INFO)
+
 from groq import Groq
 from docling.document_converter import DocumentConverter
 from docling.datamodel.base_models import DocItemLabel
 from docling_core.types.doc import DoclingDocument, NodeItem
 import config
 from parsed_block import ParsedBlock
+from rich.console import Console
+import time
+
+console = Console()
 
 class PdfParser:
     """
@@ -14,9 +23,9 @@ class PdfParser:
     """
 
     def __init__(self) -> None:
-        self.model: str = config.LLM_CURATION_MODEL
-        self.client: Groq = Groq(api_key=os.environ.get(config.GROQ_API_KEY))
-        self.converter: DocumentConverter = DocumentConverter()
+        self.model = config.LLM_CURATION_MODEL
+        self.client = Groq(api_key=os.environ.get(config.GROQ_API_KEY))
+        self.converter = DocumentConverter()
 
     def _is_potentially_noise(self, text: str) -> bool:
         """
@@ -149,10 +158,12 @@ class PdfParser:
             response = chat_completion.choices[0].message.content
             clean_json = config.CODE_BLOCK_PATTERN.sub('', response).strip()
 
+            console.print("[bold]✅ LLM responded successfully with JSON data.[/bold]")
             return json.loads(clean_json)
 
         except Exception as e:
             # Return empty dict to prevent pipeline crashes on API timeouts or malformed JSON
+            console.print(f"[bold]❌ LLM API Error:[/bold] {e}")
             return {}
 
     def _get_noise_blocks(self, batch_text: str) -> list[int]:
@@ -170,32 +181,57 @@ class PdfParser:
 
         noise_risk_bids = [b for b in blocks_reg if blocks_reg[b].is_noise_risk]
         if not noise_risk_bids:
+            console.print(
+                "[bold]✨ No noise risks flagged by rule-based checks. Skipping LLM Curation [/bold]"
+            )
             return blocks_reg
+
+        console.print(f"[bold]🤖 LLM Curation:[/bold] Evaluating {len(noise_risk_bids)} high-risk noise blocks")
 
         current_batch_text = ""
         bids_to_remove = []
+        current_batch_count = 0
         for bid in noise_risk_bids:
             block_text = blocks_reg[bid].text
             entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
 
             if len(current_batch_text) + len(entry) > config.LLM_BATCH_CHAR_LIMIT:
+                console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")
                 bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
                 current_batch_text = ""
+                current_batch_count = 0
 
             current_batch_text += entry
             current_batch_count += 1
 
         # Catch the final, partially-filled batch
         if current_batch_text:
+            console.print(f"    📤 Sending final batch of {current_batch_count} blocks to LLM")
             bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
 
+        console.print(f"[bold]✅ Curation Finished: Removed {len(bids_to_remove)} noise blocks total[/bold]")
         return {b: blocks_reg[b] for b in blocks_reg if b not in bids_to_remove}
+
+    def _format_time(self, start_time: float, end_time: float) -> str:
+        """
+        Calculates the elapsed execution time and formats.
+        """
+        elapsed_time = end_time - start_time
+        minutes = int(elapsed_time // 60)
+        seconds = int(elapsed_time % 60)
+        milliseconds = int((elapsed_time * 1000) % 1000)
+        return f"[cyan]{minutes:02d}m {seconds:02d}s {milliseconds:03d}ms[/cyan]"
 
     def extract_blocks(self, filepath: str) -> dict[int, ParsedBlock]:
         """
         Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
         """
 
+        console.print(
+            f"[bold]🚀 Starting PDF extraction for:[/bold] {os.path.basename(filepath)}"
+        )
+
+        start_time = time.perf_counter()
         blocks_reg = {}
         curr_bid = 0
         doc = self.converter.convert(filepath).document
@@ -207,17 +243,16 @@ class PdfParser:
                 blocks_reg[curr_bid] = block
                 curr_bid += 1
 
-        return self._remove_noise_blocks(blocks_reg)
+        console.print(
+            f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
+        )
 
-if __name__ == "__main__":
-    parser = PdfParser()
-    blocks = parser.extract_blocks("test_pdfs/jiy114.pdf")
+        blocks_reg = self._remove_noise_blocks(blocks_reg)
 
-    for b in blocks:
-        print("\n---")
-        print(f"**[BID: {b}]**")
-        print(blocks[b].markdown)
-        print("---\n")
+        end_time = time.perf_counter()
+        time_formatted = self._format_time(start_time, end_time)
 
-
-
+        console.print(
+            f"[bold]🎉 PDF extraction complete in {time_formatted}! Returning {len(blocks_reg)} clean blocks.[/bold]"
+        )
+        return blocks_reg
