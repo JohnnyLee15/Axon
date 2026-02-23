@@ -1,3 +1,7 @@
 groq
 docling
 rich
+torch
+transformers
+einops
+pysbd

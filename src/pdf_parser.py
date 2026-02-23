@@ -6,8 +6,10 @@ import logging
 logging.disable(logging.INFO)
 
 from groq import Groq
-from docling.document_converter import DocumentConverter
 from docling.datamodel.base_models import DocItemLabel
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem
 import config
 from parsed_block import ParsedBlock
@@ -25,7 +27,18 @@ class PdfParser:
     def __init__(self) -> None:
         self.model = config.LLM_CURATION_MODEL
         self.client = Groq(api_key=os.environ.get(config.GROQ_API_KEY))
-        self.converter = DocumentConverter()
+
+        # TODO: Implement universal device detection (CUDA, MPS, XPU)
+        device = AcceleratorDevice.MPS
+
+        pipeline_opts = PdfPipelineOptions()
+        pipeline_opts.accelerator_options = AcceleratorOptions(device=device)
+
+        self.converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
+            }
+        )
 
     def _is_potentially_noise(self, text: str) -> bool:
         """
@@ -195,7 +208,7 @@ class PdfParser:
             block_text = blocks_reg[bid].text
             entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
 
-            if len(current_batch_text) + len(entry) > config.LLM_BATCH_CHAR_LIMIT:
+            if len(current_batch_text) + len(entry) > config.LLM_CURATION_BATCH_CHAR_LIMIT:
                 console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")
                 bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
                 current_batch_text = ""
@@ -256,3 +269,16 @@ class PdfParser:
             f"[bold]🎉 PDF extraction complete in {time_formatted}! Returning {len(blocks_reg)} clean blocks.[/bold]"
         )
         return blocks_reg
+
+if __name__ == "__main__":
+    parser = PdfParser()
+    blocks_reg = parser.extract_blocks("testing/test_pdfs/jiy114.pdf")
+
+    for bid in blocks_reg:
+        print("\n===========")
+        print(f"[BID: {bid}]")
+        print(f"[label: {blocks_reg[bid].label}]")
+        print(f"[level: {blocks_reg[bid].level}]")
+        print(f"[item_type: {blocks_reg[bid].item_type}]")
+        print(blocks_reg[bid].markdown)
+        print("===========")

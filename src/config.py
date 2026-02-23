@@ -10,7 +10,7 @@ import re
 MIN_WORD_COUNT_THRESHOLD = 15
 
 # Maximum characters per Groq API request
-LLM_BATCH_CHAR_LIMIT = 4000
+LLM_CURATION_BATCH_CHAR_LIMIT = 4000
 
 LLM_CURATION_MODEL = "llama-3.3-70b-versatile"
 LLM_CURATION_MODEL_TEMPERATURE = 0.0
@@ -21,6 +21,10 @@ CODE_BLOCK_PATTERN = re.compile(r'```(?:json)?\n?|```')
 
 # JSON flag from LLM indicating a block should be deleted
 REMOVE_FLAG = 0
+
+# ------ Semantic Chunker Constants ------
+EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
+MAX_JINA_LARGE_CHUNK_CHARS = 16000
 
 # ------ Docling Parser Configurations ------
 
