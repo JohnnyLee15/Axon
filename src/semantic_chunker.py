@@ -65,6 +65,7 @@ class SemanticChunker:
         current_header = ""
         last_header= ""
 
+        # TODO: Handle table items better
         for bid in sorted(blocks_reg.keys()):
             block = blocks_reg[bid]
             block_text = block.text
