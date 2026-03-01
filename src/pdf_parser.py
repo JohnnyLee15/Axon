@@ -250,6 +250,7 @@ class PdfParser:
         doc = self.converter.convert(filepath).document
         seen_content = set()
 
+        # TODO: Build references string and remove it as block content (it'll be metadata)
         for item, level in doc.iterate_items():
             block = self._extract_block(doc, item, level, seen_content)
             if block is not None:
@@ -266,7 +267,8 @@ class PdfParser:
         time_formatted = self._format_time(start_time, end_time)
 
         console.print(
-            f"[bold]🎉 PDF extraction complete in {time_formatted}! Returning {len(blocks_reg)} clean blocks.[/bold]"
+            f"[bold]🎉 PDF extraction complete in {time_formatted}! "
+            f"Returning {len(blocks_reg)} clean blocks.[/bold]"
         )
         return blocks_reg
 

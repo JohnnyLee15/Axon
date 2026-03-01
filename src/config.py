@@ -26,6 +26,7 @@ REMOVE_FLAG = 0
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 MAX_JINA_LARGE_CHUNK_CHARS = 16000
 MIN_SPACE_SPLIT_THRESHOLD_CHARS = 10000
+MAX_HEADER_CHARS = 500
 
 # ------ Docling Parser Configurations ------
 
