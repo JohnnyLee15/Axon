@@ -10,7 +10,7 @@ from docling.datamodel.base_models import DocItemLabel
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
-from docling_core.types.doc import DoclingDocument, NodeItem
+from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 import config
 from parsed_block import ParsedBlock
 from rich.console import Console
@@ -67,9 +67,9 @@ class PdfParser:
         Extracts raw text and applies Markdown formatting based on the layout label.
         """
 
-        text = item.text.strip()
-        if not text:
+        if not item.text:
             return "", ""
+        text = item.text.strip()
 
         # Fix hyphenation across lines
         text = config.HYPHEN_WRAP_PATTERN.sub(r'\1\2', text)
@@ -94,7 +94,7 @@ class PdfParser:
         Routes the document item to the correct extraction method based on its type.
         """
 
-        if type(item).__name__ == "TableItem":
+        if isinstance(item, TableItem):
             text = item.export_to_markdown(doc=doc).strip()
             return text, text
 
