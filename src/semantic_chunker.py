@@ -7,6 +7,7 @@ import torch
 import pysbd
 from transformers import AutoModel
 import re
+from chunk_tracker import ChunkTracker
 
 class SemanticChunker:
     def __init__(self):
@@ -70,52 +71,48 @@ class SemanticChunker:
         self,
         block_text,
         prefix,
-        large_blocks,
-        current_large_block
+        tracker,
+        bid
     ):
         sub_chunks = self._split_oversized_block(block_text, prefix)
         if sub_chunks:
-            spacer = "\n\n" if current_large_block else ""
-            candidate_len = len(current_large_block) + len(spacer) + len(sub_chunks[0])
+            spacer = "\n\n" if tracker.get_curr_text() else ""
+            candidate_len = len(tracker.get_curr_text()) + len(spacer) + len(sub_chunks[0])
             if candidate_len <= config.MAX_JINA_LARGE_CHUNK_CHARS:
-                current_large_block += f"{spacer}{sub_chunks.pop(0)}"
+                tracker.add_text(f"{spacer}{sub_chunks.pop(0)}", bid)
 
-            if current_large_block:
-                large_blocks.append(current_large_block)
-                current_large_block = ""
+            tracker.flush()
 
-            if len(sub_chunks) > 1:
-                large_blocks.extend(sub_chunks[:-1])
+            for chunk in sub_chunks[:-1]:
+                tracker.add_text(chunk, bid)
+                tracker.flush()
 
             if sub_chunks:
-                current_large_block = sub_chunks[-1]
+                tracker.add_text(sub_chunks[-1], bid)
 
-        return current_large_block
 
     def _process_regular_block(
         self,
         block_text,
         prefix,
-        current_large_block,
         current_header,
-        large_blocks
+        tracker,
+        bid
     ):
         full_entry = f"{prefix}{block_text}"
-        spacer = "\n\n" if current_large_block else ""
+        spacer = "\n\n" if tracker.get_curr_text() else ""
 
-        candidate_len = len(current_large_block) + len(spacer) + len(full_entry)
+        candidate_len = len(tracker.get_curr_text()) + len(spacer) + len(full_entry)
         if candidate_len > config.MAX_JINA_LARGE_CHUNK_CHARS:
-            if current_large_block:
-                large_blocks.append(current_large_block)
+            tracker.flush()
+            next_block_text = f"{current_header}:\n{block_text}" if current_header else block_text
+            tracker.add_text(next_block_text, bid)
+            return
 
-            return  f"{current_header}:\n{block_text}" if current_header else block_text
-
-        current_large_block += f"{spacer}{full_entry}"
-        return current_large_block
+        tracker.add_text(f"{spacer}{full_entry}", bid)
 
     def _build_large_blocks(self, blocks_reg):
-        large_blocks = []
-        current_large_block = ""
+        tracker = ChunkTracker()
         current_header = ""
         last_header= ""
 
@@ -134,18 +131,13 @@ class SemanticChunker:
 
             is_over_sized = len(prefix) + len(block_text) > config.MAX_JINA_LARGE_CHUNK_CHARS
             if is_over_sized:
-                current_large_block = self._process_oversized_block(
-                    block_text, prefix, large_blocks, current_large_block
-                )
+                self._process_oversized_block(block_text, prefix, tracker, bid)
                 last_header = current_header
                 continue
 
-            current_large_block = self._process_regular_block(
-                block_text, prefix, current_large_block, current_header, large_blocks
-            )
+            self._process_regular_block(block_text, prefix, current_header, tracker, bid)
             last_header = current_header
 
-        if current_large_block:
-            large_blocks.append(current_large_block)
+        tracker.flush()
 
-        return large_blocks
+        return tracker.get_large_blocks(), tracker.get_char_map_list()

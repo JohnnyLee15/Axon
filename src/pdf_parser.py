@@ -271,16 +271,3 @@ class PdfParser:
             f"Returning {len(blocks_reg)} clean blocks.[/bold]"
         )
         return blocks_reg
-
-if __name__ == "__main__":
-    parser = PdfParser()
-    blocks_reg = parser.extract_blocks("testing/test_pdfs/jiy114.pdf")
-
-    for bid in blocks_reg:
-        print("\n===========")
-        print(f"[BID: {bid}]")
-        print(f"[label: {blocks_reg[bid].label}]")
-        print(f"[level: {blocks_reg[bid].level}]")
-        print(f"[item_type: {blocks_reg[bid].item_type}]")
-        print(blocks_reg[bid].markdown)
-        print("===========")
