@@ -5,20 +5,27 @@ logging.disable(logging.INFO)
 import config
 import torch
 import pysbd
-from transformers import AutoModel
+from transformers import AutoModel, AutoTokenizer
 import re
 from chunk_tracker import ChunkTracker
 
 class SemanticChunker:
     def __init__(self):
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
-        self.device = torch.device("mps")
-        self.seg = pysbd.Segmenter(language="en", clean=False)
-        self.model = AutoModel.from_pretrained(
+        self._device = torch.device("mps")
+        self._seg = pysbd.Segmenter(language="en", clean=False)
+
+        self._model = AutoModel.from_pretrained(
             config.EMBEDDING_MODEL,
             trust_remote_code=True
-        ).to(self.device)
-        self.model.eval()
+        ).to(self._device)
+        self._model.eval()
+
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            config.EMBEDDING_MODEL,
+            trust_remote_code=True
+        )
+
 
     def _process_oversized_sentence(self, sentence, prefix, sub_blocks):
         start_idx = 0
@@ -43,6 +50,7 @@ class SemanticChunker:
 
         return ""
 
+
     def _split_oversized_block(self, text, prefix):
         sentences = self.seg.segment(text)
         sub_blocks = []
@@ -66,6 +74,7 @@ class SemanticChunker:
             sub_blocks.append(current_sub)
 
         return sub_blocks
+
 
     def _process_oversized_block(
         self,
@@ -111,6 +120,7 @@ class SemanticChunker:
 
         tracker.add_text(f"{spacer}{full_entry}", bid)
 
+
     def _build_large_blocks(self, blocks_reg):
         tracker = ChunkTracker()
         current_header = ""
@@ -119,7 +129,7 @@ class SemanticChunker:
         # TODO: Handle table items better
         for bid in sorted(blocks_reg.keys()):
             block = blocks_reg[bid]
-            block_text = block.text
+            block_text = block.markdown
 
             if block.label == "SECTION_HEADER" and len(block_text) <= config.MAX_HEADER_CHARS:
                 current_header = block_text
@@ -141,3 +151,57 @@ class SemanticChunker:
         tracker.flush()
 
         return tracker.get_large_blocks(), tracker.get_char_map_list()
+
+    # def _embed_large_blocks(self, blocks_reg):
+    #     embeddings_dict = {}
+    #     large_blocks, char_map_list = self._build_large_blocks(blocks_reg)
+    #     for i, large_block in enumerate(large_blocks):
+    #         char_map = char_map_list[i]
+    #         tokens = self._tokenizer(
+    #             large_block,
+    #             return_tensors="pt",
+    #             return_offsets_mapping=True,
+    #             padding=True,
+    #             truncation=True,
+    #             max_length=8192
+    #         )
+
+    #         token_ids = tokens["input_ids"].to(self._device)
+    #         padding_mask = tokens["attention_mask"].to(self._device)
+
+    #         # Grab [0] because HF expects batched inputs, so batched outputs
+    #         offsets = tokens["offsets"][0].tolist()
+
+    #         with torch.no_grad():
+    #             output = self._model(input_ids=token_ids, attention_mask=padding_mask)
+    #             enriched_tokens = output.last_hidden_state[0]
+
+    #         for bid in char_map:
+    #             token_indices = []
+    #             map_start_idx, map_end_idx = char_map[bid]
+    #             for tok_idx, (tok_start_idx, tok_end_idx) in enumerate(offsets):
+
+    #                 # skip special tokens like [CLS], [SEP], etc their offsets are (0,0)
+    #                 if tok_start_idx == tok_end_idx == 0:
+    #                     continue
+
+    #                 if tok_end_idx > map_start_idx and map_end_idx > tok_start_idx:
+    #                     token_indices.append(tok_idx)
+
+    #             # Edge case should never really happen, we'll skip this block
+    #             if not token_indices:
+    #                 continue
+
+    #             start_tok_idx = min(token_indices)
+    #             end_tok_idx = max(token_indices) + 1
+
+    #             token_embeddings = enriched_tokens[start_tok_idx:end_tok_idx, :]
+    #             mean_embedding
+
+
+
+
+
+
+
+

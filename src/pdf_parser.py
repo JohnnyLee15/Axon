@@ -62,13 +62,13 @@ class PdfParser:
 
         return False
 
-    def _extract_item_with_text_attr(self, item: NodeItem, level: int) -> tuple[str, str]:
+    def _extract_item_with_text_attr(self, item: NodeItem, level: int) -> str:
         """
         Extracts raw text and applies Markdown formatting based on the layout label.
         """
 
         if not item.text:
-            return "", ""
+            return ""
         text = item.text.strip()
 
         # Fix hyphenation across lines
@@ -76,32 +76,29 @@ class PdfParser:
 
         # Apply markdown formatting based on the label
         if item.label == DocItemLabel.SECTION_HEADER:
-            md_content = f"{'#' * max(1, level)} {text}"
+            return f"{'#' * max(1, level)} {text}"
         elif item.label == DocItemLabel.LIST_ITEM:
-            md_content = f"* {text}"
-        else:
-            md_content = text
+            return f"* {text}"
 
-        return text, md_content
+        return text
 
     def _extract_block_text(
         self,
         doc: DoclingDocument,
         item: NodeItem,
         level: int
-    ) -> tuple[str, str]:
+    ) -> str:
         """
         Routes the document item to the correct extraction method based on its type.
         """
 
         if isinstance(item, TableItem):
-            text = item.export_to_markdown(doc=doc).strip()
-            return text, text
+            return item.export_to_markdown(doc=doc).strip()
 
         if hasattr(item, "text"):
             return self._extract_item_with_text_attr(item, level)
 
-        return "", ""
+        return ""
 
     def _get_item_page_numbers(self, item: NodeItem) -> list[int]:
         """
@@ -127,27 +124,25 @@ class PdfParser:
         if item.label in config.EXCLUDED_DOCLING_LABELS:
             return None
 
-        text, md_content = self._extract_block_text(doc, item, level)
+        markdown = self._extract_block_text(doc, item, level)
 
         # Ensure text contains numbers or letters
-        if not any(char.isalnum() for char in text):
+        if not any(char.isalnum() for char in markdown):
             return None
 
         # Ensure text is new
-        content_hash = hash(text)
+        content_hash = hash(markdown)
         if content_hash in seen_content:
             return None
         seen_content.add(content_hash)
 
         page_numbers = self._get_item_page_numbers(item)
         return ParsedBlock(
-            text=text,
-            markdown=md_content,
+            markdown=markdown,
             label=item.label.name,
             item_type=type(item).__name__,
             page_numbers=page_numbers,
-            is_noise_risk=self._is_potentially_noise(text),
-            level=level
+            is_noise_risk=self._is_potentially_noise(markdown)
         )
 
     def _call_curation_llm(self, user_prompt: str) -> dict:
@@ -205,7 +200,7 @@ class PdfParser:
         bids_to_remove = []
         current_batch_count = 0
         for bid in noise_risk_bids:
-            block_text = blocks_reg[bid].text
+            block_text = blocks_reg[bid].markdown
             entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
 
             if len(current_batch_text) + len(entry) > config.LLM_CURATION_BATCH_CHAR_LIMIT:
