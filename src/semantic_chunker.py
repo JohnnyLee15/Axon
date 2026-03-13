@@ -1,8 +1,8 @@
-import logging
 # Suppress logging
+import logging
 logging.disable(logging.INFO)
 
-import config
+from config import *
 import torch
 import pysbd
 from transformers import AutoModel, AutoTokenizer
@@ -16,141 +16,182 @@ class SemanticChunker:
         self._seg = pysbd.Segmenter(language="en", clean=False)
 
         self._model = AutoModel.from_pretrained(
-            config.EMBEDDING_MODEL,
+            EMBEDDING_MODEL,
             trust_remote_code=True
         ).to(self._device)
         self._model.eval()
 
         self._tokenizer = AutoTokenizer.from_pretrained(
-            config.EMBEDDING_MODEL,
+            EMBEDDING_MODEL,
             trust_remote_code=True
         )
 
 
-    def _process_oversized_sentence(self, sentence, prefix, sub_blocks):
+    def _split_sentence(self, tracker, sentence):
         start_idx = 0
         while start_idx < len(sentence):
-            end_idx = start_idx + config.MAX_JINA_LARGE_CHUNK_CHARS - len(prefix)
+            spacer = " " if tracker.curr_len() > 0 else ""
+            end_idx = start_idx + MAX_CHUNK_CHARS - tracker.curr_len() - len(spacer)
 
             if end_idx >= len(sentence):
-                chunk = sentence[start_idx:]
-                return f"{prefix}{chunk}"
+                tracker.add_text(spacer + sentence[start_idx:])
+                return
 
             ws_match = re.search(r'.*(\s)', sentence[start_idx:end_idx])
-            has_space_after_threshold = ws_match and ws_match.start(1) >= config.MIN_SPACE_SPLIT_THRESHOLD_CHARS
-            if has_space_after_threshold:
-                last_space_idx = start_idx + ws_match.start(1)
-                chunk = sentence[start_idx:last_space_idx]
-                start_idx = last_space_idx
+            if ws_match:
+                last_ws_idx = start_idx + ws_match.start(1)
+                next_text = spacer + sentence[start_idx:last_ws_idx]
+                next_len = tracker.curr_len() + len(next_text)
+
+                if next_len >=  MIN_CHUNK_CHARS:
+                    tracker.add_text(next_text)
+                    start_idx = last_ws_idx + 1
+                else:
+                    tracker.add_text(spacer + sentence[start_idx:end_idx])
+                    start_idx = end_idx
+
             else:
-                chunk = sentence[start_idx:end_idx]
+                tracker.add_text(spacer + sentence[start_idx:end_idx])
                 start_idx = end_idx
-
-            sub_blocks.append(f"{prefix}{chunk}")
-
-        return ""
+            tracker.flush()
 
 
-    def _split_oversized_block(self, text, prefix):
-        sentences = self.seg.segment(text)
-        sub_blocks = []
-        current_sub = prefix
+    def _split_block(self, tracker, next_text):
+        sentences = self._seg.segment(next_text)
 
         for sentence in sentences:
-            candidate_len = len(prefix) + len(sentence)
-            if len(sentence) > config.MAX_JINA_LARGE_CHUNK_CHARS:
-                current_sub = self._process_oversized_sentence(sentence, prefix, sub_blocks)
-                continue
-
-            spacer = " " if current_sub != prefix else ""
-            candidate_len = len(current_sub) + len(spacer) + len(sentence)
-            if candidate_len > config.MAX_JINA_LARGE_CHUNK_CHARS:
-                sub_blocks.append(current_sub)
-                current_sub = f"{prefix}{sentence}"
+            spacer = " " if tracker.curr_len() > 0 else ""
+            next_text = spacer + sentence
+            next_len= len(next_text) + tracker.curr_len()
+            if next_len <= MAX_CHUNK_CHARS:
+                tracker.add_text(next_text)
             else:
-                current_sub += f"{spacer}{sentence}"
-
-        if current_sub and current_sub != prefix:
-            sub_blocks.append(current_sub)
-
-        return sub_blocks
-
-
-    def _process_oversized_block(
-        self,
-        block_text,
-        prefix,
-        tracker,
-        bid
-    ):
-        sub_chunks = self._split_oversized_block(block_text, prefix)
-        if sub_chunks:
-            spacer = "\n\n" if tracker.get_curr_text() else ""
-            candidate_len = len(tracker.get_curr_text()) + len(spacer) + len(sub_chunks[0])
-            if candidate_len <= config.MAX_JINA_LARGE_CHUNK_CHARS:
-                tracker.add_text(f"{spacer}{sub_chunks.pop(0)}", bid)
-
-            tracker.flush()
-
-            for chunk in sub_chunks[:-1]:
-                tracker.add_text(chunk, bid)
-                tracker.flush()
-
-            if sub_chunks:
-                tracker.add_text(sub_chunks[-1], bid)
+                if tracker.curr_len() >= MIN_CHUNK_CHARS:
+                    tracker.flush()
+                    if len(sentence) <= MAX_CHUNK_CHARS:
+                        tracker.add_text(sentence)
+                    else:
+                        self._split_sentence(tracker, sentence)
+                else:
+                    self._split_sentence(tracker, sentence)
 
 
-    def _process_regular_block(
-        self,
-        block_text,
-        prefix,
-        current_header,
-        tracker,
-        bid
-    ):
-        full_entry = f"{prefix}{block_text}"
-        spacer = "\n\n" if tracker.get_curr_text() else ""
-
-        candidate_len = len(tracker.get_curr_text()) + len(spacer) + len(full_entry)
-        if candidate_len > config.MAX_JINA_LARGE_CHUNK_CHARS:
-            tracker.flush()
-            next_block_text = f"{current_header}:\n{block_text}" if current_header else block_text
-            tracker.add_text(next_block_text, bid)
-            return
-
-        tracker.add_text(f"{spacer}{full_entry}", bid)
-
-
-    def _build_large_blocks(self, blocks_reg):
+    def _build_chunks(self, blocks_reg):
         tracker = ChunkTracker()
-        current_header = ""
-        last_header= ""
+        last_chunk_was_header = False
 
-        # TODO: Handle table items better
-        for bid in sorted(blocks_reg.keys()):
+        for bid in blocks_reg:
             block = blocks_reg[bid]
             block_text = block.markdown
+            spacer = "\n\n" if tracker.curr_len() > 0 else ""
+            next_text = spacer + block_text
+            next_len = tracker.curr_len() + len(next_text)
 
-            if block.label == "SECTION_HEADER" and len(block_text) <= config.MAX_HEADER_CHARS:
-                current_header = block_text
-                continue
+            if block.label == "SECTION_HEADER" and len(block_text) <= MAX_HEADER_CHARS:
+                if tracker.curr_len() >= MIN_CHUNK_CHARS:
+                    tracker.flush()
+                    tracker.add_text(block_text)
+                elif last_chunk_was_header:
+                    if tracker.curr_len() < MIN_CHUNK_CHARS:
+                        tracker.add_text(next_text)
+                    else:
+                        if next_len <= MAX_HEADER_STACK_CHARS:
+                            tracker.add_text(next_text)
+                        else:
+                            tracker.flush()
+                            if len(block_text) <= MAX_CHUNK_CHARS:
+                                tracker.add_text(block_text)
+                            else:
+                                self._split_block(tracker, block_text)
 
-            prefix = ""
-            if current_header and current_header != last_header:
-                prefix = f"{current_header}:\n"
+                else:
+                    tracker.add_text(next_text)
+                last_chunk_was_header = True
 
-            is_over_sized = len(prefix) + len(block_text) > config.MAX_JINA_LARGE_CHUNK_CHARS
-            if is_over_sized:
-                self._process_oversized_block(block_text, prefix, tracker, bid)
-                last_header = current_header
-                continue
+            else:
+                last_chunk_was_header = False
+                if next_len <= MAX_CHUNK_CHARS:
+                    tracker.add_text(next_text)
+                else:
+                    if tracker.curr_len() >= MIN_CHUNK_CHARS:
+                        tracker.flush()
+                        if len(block_text) <= MAX_CHUNK_CHARS:
+                            tracker.add_text(block_text)
+                        else:
+                            self._split_block(tracker, block_text)
+                    else:
 
-            self._process_regular_block(block_text, prefix, current_header, tracker, bid)
-            last_header = current_header
+                        self._split_block(tracker, block_text)
 
         tracker.flush()
+        return tracker.get_chunks()
 
-        return tracker.get_large_blocks(), tracker.get_char_map_list()
+
+
+
+
+
+
+    # def _split_sentence(self, tracker, sentence):
+    #     start_idx = 0
+    #     while start_idx < len(sentence):
+    #         end_idx = start_idx + MAX_CHUNK_CHARS - tracker.curr_len()
+
+    #         if end_idx >= len(sentence):
+    #             chunk = sentence[start_idx:]
+    #             return f"{chunk}"
+
+    #         ws_match = re.search(r'.*(\s)', sentence[start_idx:end_idx])
+    #         has_space_after_threshold = ws_match and ws_match.start(1) >= MIN_SPACE_SPLIT_THRESHOLD_CHARS
+    #         if has_space_after_threshold:
+    #             last_space_idx = start_idx + ws_match.start(1)
+    #             chunk = sentence[start_idx:last_space_idx]
+    #             start_idx = last_space_idx
+    #         else:
+    #             chunk = sentence[start_idx:end_idx]
+    #             start_idx = end_idx
+
+    #         sub_blocks.append(chunk)
+
+    #     return ""
+
+
+
+
+
+    # def _build_large_blocks(self, blocks_reg):
+    #     tracker = LargeChunkTracker()
+    #     current_header = ""
+    #     last_header= ""
+
+    #     # TODO: Handle table items better
+    #     for bid in sorted(blocks_reg.keys()):
+    #         block = blocks_reg[bid]
+    #         block_text = block.markdown
+
+    #         if block.label == "SECTION_HEADER" and len(block_text) <= MAX_HEADER_CHARS:
+    #             current_header = block_text
+    #             continue
+
+    #         prefix = ""
+    #         if current_header and current_header != last_header:
+    #             prefix = f"{current_header}:\n"
+
+    #         is_over_sized = len(prefix) + len(block_text) > MAX_JINA_LARGE_CHUNK_CHARS
+    #         if is_over_sized:
+    #             self._process_oversized_block(block_text, prefix, tracker, bid)
+    #             last_header = current_header
+    #             continue
+
+    #         self._process_regular_block(block_text, prefix, current_header, tracker, bid)
+    #         last_header = current_header
+
+    #     tracker.flush()
+
+    #     return tracker.get_large_blocks(), tracker.get_char_map_list()
+
+
+
 
     # def _embed_large_blocks(self, blocks_reg):
     #     embeddings_dict = {}

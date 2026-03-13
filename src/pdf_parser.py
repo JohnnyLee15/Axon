@@ -11,7 +11,7 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
-import config
+from config import *
 from parsed_block import ParsedBlock
 from rich.console import Console
 import time
@@ -25,8 +25,8 @@ class PdfParser:
     """
 
     def __init__(self) -> None:
-        self.model = config.LLM_CURATION_MODEL
-        self.client = Groq(api_key=os.environ.get(config.GROQ_API_KEY))
+        self.model = LLM_CURATION_MODEL
+        self.client = Groq(api_key=os.environ.get(GROQ_API_KEY))
 
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
         device = AcceleratorDevice.MPS
@@ -49,15 +49,15 @@ class PdfParser:
 
         # Strip markdown formatting
         clean_text = text_lower.replace('#', '').strip()
-        if clean_text in config.SCIENTIFIC_HEADERS:
+        if clean_text in SCIENTIFIC_HEADERS:
             return False
 
-        for pattern in config.NOISE_REGEX_PATTERNS:
+        for pattern in NOISE_REGEX_PATTERNS:
             if pattern.search(text_lower):
                 return True
 
         words = text_lower.split()
-        if len(words) <= config.MIN_WORD_COUNT_THRESHOLD:
+        if len(words) <= MIN_WORD_COUNT_THRESHOLD:
             return True
 
         return False
@@ -72,7 +72,7 @@ class PdfParser:
         text = item.text.strip()
 
         # Fix hyphenation across lines
-        text = config.HYPHEN_WRAP_PATTERN.sub(r'\1\2', text)
+        text = HYPHEN_WRAP_PATTERN.sub(r'\1\2', text)
 
         # Apply markdown formatting based on the label
         if item.label == DocItemLabel.SECTION_HEADER:
@@ -100,15 +100,6 @@ class PdfParser:
 
         return ""
 
-    def _get_item_page_numbers(self, item: NodeItem) -> list[int]:
-        """
-        Extracts unique page numbers from the item's provenance metadata.
-        """
-
-        if hasattr(item, "prov") and item.prov:
-            return list(set(p.page_no for p in item.prov if hasattr(p, "page_no")))
-
-        return []
 
     def _extract_block(
         self,
@@ -121,7 +112,7 @@ class PdfParser:
         Processes a single item, returning a ParsedBlock if it passes validity checks.
         """
 
-        if item.label in config.EXCLUDED_DOCLING_LABELS:
+        if item.label in EXCLUDED_DOCLING_LABELS:
             return None
 
         markdown = self._extract_block_text(doc, item, level)
@@ -136,12 +127,10 @@ class PdfParser:
             return None
         seen_content.add(content_hash)
 
-        page_numbers = self._get_item_page_numbers(item)
         return ParsedBlock(
             markdown=markdown,
             label=item.label.name,
             item_type=type(item).__name__,
-            page_numbers=page_numbers,
             is_noise_risk=self._is_potentially_noise(markdown)
         )
 
@@ -155,16 +144,16 @@ class PdfParser:
         try:
             chat_completion = self.client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": config.LLM_CURATION_PROMPT},
+                    {"role": "system", "content": LLM_CURATION_PROMPT},
                     {"role": "user", "content": formatted_prompt}
                 ],
                 model=self.model,
                 response_format={"type": "json_object"},
-                temperature=config.LLM_CURATION_MODEL_TEMPERATURE
+                temperature=LLM_CURATION_MODEL_TEMPERATURE
             )
 
             response = chat_completion.choices[0].message.content
-            clean_json = config.CODE_BLOCK_PATTERN.sub('', response).strip()
+            clean_json = CODE_BLOCK_PATTERN.sub('', response).strip()
 
             console.print("[bold]✅ LLM responded successfully with JSON data.[/bold]")
             return json.loads(clean_json)
@@ -180,7 +169,7 @@ class PdfParser:
         """
 
         results = self._call_curation_llm(batch_text)
-        return [int(bid) for bid in results if results[bid] == config.REMOVE_FLAG]
+        return [int(bid) for bid in results if results[bid] == REMOVE_FLAG]
 
     def _remove_noise_blocks(self, blocks_reg: dict) -> dict:
         """
@@ -203,7 +192,7 @@ class PdfParser:
             block_text = blocks_reg[bid].markdown
             entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
 
-            if len(current_batch_text) + len(entry) > config.LLM_CURATION_BATCH_CHAR_LIMIT:
+            if len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
                 console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")
                 bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
                 current_batch_text = ""

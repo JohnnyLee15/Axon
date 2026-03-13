@@ -1,36 +1,24 @@
 class ChunkTracker:
     def __init__(self):
-        self._large_blocks = []
-        self._char_map_list = []
-        self._curr_char_map = {}
-        self._curr_text = ""
+        self._chunks = {}
+        self._curr_chunk= ""
+        self._curr_id = 0
 
-    def add_text(self, text, bid):
-        if not text:
+    def add_text(self, next_text):
+        if not next_text:
             return
 
-        start_idx = len(self._curr_text)
-        self._curr_text += text
-        end_idx = len(self._curr_text)
-
-        if bid in self._curr_char_map:
-            self._curr_char_map[bid] = (self._curr_char_map[bid][0], end_idx)
-        else:
-            self._curr_char_map[bid] = (start_idx, end_idx)
+        self._curr_chunk += next_text
 
     def flush(self):
-        if self._curr_text:
-            self._large_blocks.append(self._curr_text)
-            self._char_map_list.append(self._curr_char_map)
-            self._curr_text = ""
-            self._curr_char_map = {}
+        if self._curr_chunk:
+            self._chunks[self._curr_id] = self._curr_chunk
+            self._curr_chunk = ""
+            self._curr_id += 1
 
-    def get_curr_text(self):
-        return self._curr_text
+    def curr_len(self):
+        return len(self._curr_chunk)
 
-    def get_large_blocks(self):
-        return self._large_blocks
-
-    def get_char_map_list(self):
-        return self._char_map_list
+    def get_chunks(self):
+        return self._chunks
 
