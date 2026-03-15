@@ -12,7 +12,8 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from config import *
-from parsed_block import ParsedBlock
+from block_tracker import BlockTracker
+from types import SimpleNamespace
 from rich.console import Console
 import time
 
@@ -106,13 +107,21 @@ class PdfParser:
         doc: DoclingDocument,
         item: NodeItem,
         level: int,
-        seen_content: set[int]
-    ) -> ParsedBlock | None:
+        tracker: BlockTracker
+    ):
         """
-        Processes a single item, returning a ParsedBlock if it passes validity checks.
+        Processes a single item, adding a block to the Tracker if it passes validity checks.
         """
 
         if item.label in EXCLUDED_DOCLING_LABELS:
+            return None
+
+        is_tiny_text = (
+            item.label.name == "TEXT" and
+            item.text and
+            len(item.text) <= MIN_CHAR_COUNT
+        )
+        if is_tiny_text:
             return None
 
         markdown = self._extract_block_text(doc, item, level)
@@ -121,18 +130,7 @@ class PdfParser:
         if not any(char.isalnum() for char in markdown):
             return None
 
-        # Ensure text is new
-        content_hash = hash(markdown)
-        if content_hash in seen_content:
-            return None
-        seen_content.add(content_hash)
-
-        return ParsedBlock(
-            markdown=markdown,
-            label=item.label.name,
-            item_type=type(item).__name__,
-            is_noise_risk=self._is_potentially_noise(markdown)
-        )
+        tracker.add_block(markdown, item.label.name, self._is_potentially_noise(markdown))
 
     def _call_curation_llm(self, user_prompt: str) -> dict:
         """
@@ -219,7 +217,7 @@ class PdfParser:
         milliseconds = int((elapsed_time * 1000) % 1000)
         return f"[cyan]{minutes:02d}m {seconds:02d}s {milliseconds:03d}ms[/cyan]"
 
-    def extract_blocks(self, filepath: str) -> dict[int, ParsedBlock]:
+    def extract_blocks(self, filepath: str) -> dict[int, SimpleNamespace]:
         """
         Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
         """
@@ -229,18 +227,31 @@ class PdfParser:
         )
 
         start_time = time.perf_counter()
-        blocks_reg = {}
-        curr_bid = 0
         doc = self.converter.convert(filepath).document
-        seen_content = set()
+        item_iter = iter(doc.iterate_items())
+        tracker = BlockTracker()
+        processing = True
 
-        # TODO: Build references string and remove it as block content (it'll be metadata)
-        for item, level in doc.iterate_items():
-            block = self._extract_block(doc, item, level, seen_content)
-            if block is not None:
-                blocks_reg[curr_bid] = block
-                curr_bid += 1
+        while processing:
+            curr = next(item_iter, None)
+            if curr is None:
+                processing = False
+                continue
 
+            item, level = curr
+            is_reference_header = (
+                item.label.name == "SECTION_HEADER" and
+                item.text and
+                item.text.strip().lower() in REFERENCE_HEADERS
+            )
+
+            if is_reference_header:
+                processing = False
+                continue
+
+            self._extract_block(doc, item, level, tracker)
+
+        blocks_reg = tracker.get_blocks_reg()
         console.print(
             f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
         )

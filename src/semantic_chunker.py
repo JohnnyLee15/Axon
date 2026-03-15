@@ -79,8 +79,8 @@ class SemanticChunker:
     def _build_chunks(self, blocks_reg):
         tracker = ChunkTracker()
         last_chunk_was_header = False
-
-        for bid in blocks_reg:
+        
+        for bid in sorted(blocks_reg):
             block = blocks_reg[bid]
             block_text = block.markdown
             spacer = "\n\n" if tracker.curr_len() > 0 else ""

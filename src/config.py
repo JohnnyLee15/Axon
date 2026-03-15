@@ -9,6 +9,8 @@ import re
 # Blocks under this count trigger an LLM review
 MIN_WORD_COUNT_THRESHOLD = 15
 
+MIN_CHAR_COUNT = 15
+
 # Maximum characters per Groq API request
 LLM_CURATION_BATCH_CHAR_LIMIT = 4000
 
@@ -32,6 +34,16 @@ MIN_CHUNK_CHARS = 300
 MAX_CHUNK_CHARS = 1500
 
 # ------ Docling Parser Configurations ------
+
+REFERENCE_HEADERS = [
+    "references",
+    "bibliography",
+    "literature cited",
+    "works cited",
+    "citations",
+    "reference list",
+    "selected bibliography"
+]
 
 EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PAGE_HEADER,
