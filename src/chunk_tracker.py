@@ -6,14 +6,16 @@ Chunk: TypeAlias = SimpleNamespace
 class ChunkTracker:
     def __init__(self) -> None:
         self._chunks = {}
-        self._curr_chunk= ""
+        self._curr_chunk = ""
         self._curr_id = 0
+        self._last_was_header = False
 
-    def add_text(self, next_text: str) -> None:
+    def add_text(self, next_text: str, last_was_header: bool=False) -> None:
         if not next_text:
             return
 
         self._curr_chunk += next_text
+        self._last_was_header = last_was_header
 
     def flush(self) -> None:
         if self._curr_chunk:
@@ -24,6 +26,7 @@ class ChunkTracker:
 
             self._curr_chunk = ""
             self._curr_id += 1
+            self._last_was_header=False
 
     def len(self) -> int:
         return len(self._curr_chunk)
@@ -33,4 +36,7 @@ class ChunkTracker:
 
     def is_empty(self) -> bool:
         return len(self._curr_chunk) == 0
+
+    def last_was_header(self) -> bool:
+        return self._last_was_header
 

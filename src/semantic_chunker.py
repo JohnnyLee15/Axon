@@ -30,6 +30,10 @@ class SemanticChunker:
         )
 
 
+    def _add_spacer(self, curr_len: int, text: str, spacer: str) -> str:
+        return (spacer if curr_len > 0 else "") + text
+
+
     def _find_ws_cut_idx(
         self,
         tracker: ChunkTracker,
@@ -44,7 +48,7 @@ class SemanticChunker:
         last_ws_idx = start_idx + ws_match.start(1)
         ws_cand = self._add_spacer(tracker.len(), sentence[start_idx:last_ws_idx], spacer=" ")
 
-        if tracker.len() + len(ws_cand) >=  MIN_CHUNK_CHARS:
+        if tracker.len() + len(ws_cand) >= MIN_CHUNK_CHARS:
             return last_ws_idx, last_ws_idx + 1
 
         return end_idx, end_idx
@@ -92,23 +96,25 @@ class SemanticChunker:
                 self._add_or_split(tracker, sentence, self._split_sentence)
 
 
-    def _add_spacer(self, curr_len: int, text: str, spacer: str) -> str:
-        return (spacer if curr_len > 0 else "") + text
-
-
     def _process_body(self, tracker: ChunkTracker, block_text: str) -> None:
         cand_text = self._add_spacer(tracker.len(), block_text, spacer="\n\n")
         if tracker.len() + len(cand_text) <= MAX_CHUNK_CHARS:
             tracker.add_text(cand_text)
-            return
-
-        self._add_or_split(tracker, block_text, self._split_block)
+        else:
+            self._add_or_split(tracker, block_text, self._split_block)
 
 
     def _process_header(self, tracker: ChunkTracker, block_text: str) -> None:
-        if tracker.len() >= MIN_CHUNK_CHARS:
+        cand_header = self._add_spacer(tracker.len(), block_text, spacer="\n\n")
+        flush_tracker = (
+            (tracker.len() >= MIN_CHUNK_CHARS and not tracker.last_was_header()) or
+            (tracker.last_was_header() and tracker.len() + len(cand_header) > MAX_HEADER_STACK_CHARS)
+        )
+        if flush_tracker:
             tracker.flush()
-        tracker.add_text(self._add_spacer(tracker.len(), block_text, spacer="\n\n"))
+            cand_header = block_text
+
+        tracker.add_text(cand_header, True)
 
 
     def _build_chunks(self, blocks_reg: dict[int, Block]) -> dict[int, Chunk]:
