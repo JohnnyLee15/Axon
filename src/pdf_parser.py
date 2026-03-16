@@ -12,8 +12,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from config import *
-from block_tracker import BlockTracker
-from types import SimpleNamespace
+from block_tracker import BlockTracker, Block
 from rich.console import Console
 import time
 
@@ -217,7 +216,7 @@ class PdfParser:
         milliseconds = int((elapsed_time * 1000) % 1000)
         return f"[cyan]{minutes:02d}m {seconds:02d}s {milliseconds:03d}ms[/cyan]"
 
-    def extract_blocks(self, filepath: str) -> dict[int, SimpleNamespace]:
+    def extract_blocks(self, filepath: str) -> dict[int, Block]:
         """
         Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
         """
