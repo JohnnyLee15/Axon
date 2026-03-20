@@ -27,6 +27,9 @@ class ContextBufferTracker:
     def get_context_buffers(self) -> list[str]:
         return self._context_buffers
 
+    def get_curr_buffer(self) -> str:
+        return self._curr_buffer
+
     def get_char_map_list(self) -> list[dict[int, tuple[int, int]]]:
         return self._char_map_list
 

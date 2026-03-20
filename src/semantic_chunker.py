@@ -29,6 +29,13 @@ class SemanticChunker:
             trust_remote_code=True
         )
 
+    def __call__(self, blocks_reg: dict[int, Block]) -> dict[int, Chunk]:
+        """Executes the end-to-end chunking and embedding pipeline."""
+        chunks = self._build_chunks(blocks_reg)
+        context_buffers, char_map_list = self._build_context_buffers(chunks)
+        self._gen_chunk_embeddings(chunks, context_buffers, char_map_list)
+        return chunks
+
 
     def _add_spacer(self, curr_len: int, text: str, spacer: str) -> str:
         return (spacer if curr_len > 0 else "") + text
@@ -146,7 +153,13 @@ class SemanticChunker:
             chunk_text = chunks[cid].markdown
             cand_text = self._add_spacer(tracker.len(), chunk_text, spacer="\n\n")
 
-            if tracker.len() + len(cand_text) <= MAX_JINA_LARGE_CHUNK_CHARS:
+            cand_toks_count = len(self._tokenizer(
+                tracker.get_curr_buffer() + cand_text,
+                return_attention_mask=False,
+                return_token_type_ids=False
+            )["input_ids"])
+
+            if cand_toks_count <= MAX_JINA_TOKS:
                 tracker.add_chunk(cand_text, cid)
 
             else:
@@ -155,6 +168,31 @@ class SemanticChunker:
 
         tracker.flush()
         return tracker.get_context_buffers(), tracker.get_char_map_list()
+
+    def _get_chunk_token_indices(
+        self,
+        map_start: int,
+        map_end: int,
+        offsets: list[tuple[int, int]],
+        tok_idx: int
+    ) -> tuple[list[int], int]:
+        token_indices = []
+        within_chunk = True
+        num_tokens = len(offsets)
+
+        while tok_idx < num_tokens and within_chunk:
+            tok_start, tok_end = offsets[tok_idx]
+            if tok_start >= map_end:
+                within_chunk = False
+                continue
+
+            if (tok_start != 0 or tok_end != 0) and tok_end > map_start:
+                token_indices.append(tok_idx)
+            tok_idx += 1
+
+        # tok_idx - 1 incase the current tok overlaps with characters in the next chunk
+        next_tok_idx = max(0, tok_idx - 1)
+        return token_indices, next_tok_idx
 
 
     def _gen_chunk_embeddings(
@@ -168,48 +206,32 @@ class SemanticChunker:
             tokens = self._tokenizer(
                 context_buffer,
                 return_tensors="pt",
-                return_offsets_mapping=True,
-                padding=True,
-                truncation=True,
-                max_length=8192
+                return_offsets_mapping=True
             )
 
             token_ids = tokens["input_ids"].to(self._device)
             padding_mask = tokens["attention_mask"].to(self._device)
 
             # Grab [0] because HF expects batched inputs, so batched outputs
-            offsets = tokens["offsets_mapping"][0].tolist()
+            offsets = tokens["offset_mapping"][0].tolist()
 
             with torch.no_grad():
                 output = self._model(input_ids=token_ids, attention_mask=padding_mask)
                 enriched_tokens = output.last_hidden_state[0]
 
+            tok_idx = 0
             for cid in sorted(char_map):
-                token_indices = []
-                map_start_idx, map_end_idx = char_map[cid]
-                for tok_idx, (tok_start_idx, tok_end_idx) in enumerate(offsets):
+                map_start, map_end = char_map[cid]
+                token_indices, tok_idx = self._get_chunk_token_indices(
+                    map_start,
+                    map_end,
+                    offsets,
+                    tok_idx
+                )
 
-                    # skip special tokens like [CLS], [SEP], etc their offsets are (0,0)
-                    if tok_start_idx == tok_end_idx == 0:
-                        continue
-
-                    if tok_end_idx > map_start_idx and map_end_idx > tok_start_idx:
-                        token_indices.append(tok_idx)
-
-                # Edge case should never really happen, we'll skip this block
-                if not token_indices:
-                    continue
-
-                start_tok_idx = min(token_indices)
-                end_tok_idx = max(token_indices) + 1
-
-                token_embeddings = enriched_tokens[start_tok_idx:end_tok_idx, :]
+                start_tok, end_tok = token_indices[0], token_indices[-1] + 1
+                token_embeddings = enriched_tokens[start_tok:end_tok, :]
                 chunks[cid].embedding = torch.mean(token_embeddings, dim=0)
-
-
-
-
-
 
 
 

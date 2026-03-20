@@ -40,6 +40,57 @@ class PdfParser:
             }
         )
 
+    def __call__(self, filepath: str) -> dict[int, Block]:
+        """
+        Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
+        """
+
+        console.print(
+            f"[bold]🚀 Starting PDF extraction for:[/bold] {os.path.basename(filepath)}"
+        )
+
+        start_time = time.perf_counter()
+        doc = self.converter.convert(filepath).document
+        item_iter = iter(doc.iterate_items())
+        tracker = BlockTracker()
+        processing = True
+
+        while processing:
+            curr = next(item_iter, None)
+            if curr is None:
+                processing = False
+                continue
+
+            item, level = curr
+            is_reference_header = (
+                item.label.name == "SECTION_HEADER" and
+                item.text and
+                item.text.strip().lower() in REFERENCE_HEADERS
+            )
+
+            if is_reference_header:
+                processing = False
+                continue
+
+            self._extract_block(doc, item, level, tracker)
+
+        blocks_reg = tracker.get_blocks_reg()
+        console.print(
+            f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
+        )
+
+        blocks_reg = self._remove_noise_blocks(blocks_reg)
+
+        end_time = time.perf_counter()
+        time_formatted = self._format_time(start_time, end_time)
+
+        console.print(
+            f"[bold]🎉 PDF extraction complete in {time_formatted}! "
+            f"Returning {len(blocks_reg)} clean blocks.[/bold]"
+        )
+        return blocks_reg
+
+
     def _is_potentially_noise(self, text: str) -> bool:
         """
         Applies rule-based checks to flag likely academic noise.
@@ -216,52 +267,3 @@ class PdfParser:
         milliseconds = int((elapsed_time * 1000) % 1000)
         return f"[cyan]{minutes:02d}m {seconds:02d}s {milliseconds:03d}ms[/cyan]"
 
-    def extract_blocks(self, filepath: str) -> dict[int, Block]:
-        """
-        Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
-        """
-
-        console.print(
-            f"[bold]🚀 Starting PDF extraction for:[/bold] {os.path.basename(filepath)}"
-        )
-
-        start_time = time.perf_counter()
-        doc = self.converter.convert(filepath).document
-        item_iter = iter(doc.iterate_items())
-        tracker = BlockTracker()
-        processing = True
-
-        while processing:
-            curr = next(item_iter, None)
-            if curr is None:
-                processing = False
-                continue
-
-            item, level = curr
-            is_reference_header = (
-                item.label.name == "SECTION_HEADER" and
-                item.text and
-                item.text.strip().lower() in REFERENCE_HEADERS
-            )
-
-            if is_reference_header:
-                processing = False
-                continue
-
-            self._extract_block(doc, item, level, tracker)
-
-        blocks_reg = tracker.get_blocks_reg()
-        console.print(
-            f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
-        )
-
-        blocks_reg = self._remove_noise_blocks(blocks_reg)
-
-        end_time = time.perf_counter()
-        time_formatted = self._format_time(start_time, end_time)
-
-        console.print(
-            f"[bold]🎉 PDF extraction complete in {time_formatted}! "
-            f"Returning {len(blocks_reg)} clean blocks.[/bold]"
-        )
-        return blocks_reg
