@@ -6,7 +6,6 @@ from config import *
 import torch
 import pysbd
 from transformers import AutoModel, AutoTokenizer
-import re
 from chunk_tracker import ChunkTracker, Chunk
 from block_tracker import Block
 from typing import Callable
@@ -20,7 +19,8 @@ class SemanticChunker:
 
         self._model = AutoModel.from_pretrained(
             EMBEDDING_MODEL,
-            trust_remote_code=True
+            trust_remote_code=True,
+            dtype=torch.float16
         ).to(self._device)
         self._model.eval()
 
@@ -28,6 +28,7 @@ class SemanticChunker:
             EMBEDDING_MODEL,
             trust_remote_code=True
         )
+
 
     def __call__(self, blocks_reg: dict[int, Block]) -> dict[int, Chunk]:
         """Executes the end-to-end chunking and embedding pipeline."""
@@ -48,7 +49,7 @@ class SemanticChunker:
         start_idx: int,
         end_idx: int
     ) -> tuple[int, int]:
-        ws_match = re.search(r'.*(\s)', sentence[start_idx:end_idx])
+        ws_match = WS_RE.search(sentence[start_idx:end_idx])
         if not ws_match:
             return end_idx, end_idx
 
@@ -230,8 +231,20 @@ class SemanticChunker:
                 )
 
                 start_tok, end_tok = token_indices[0], token_indices[-1] + 1
-                token_embeddings = enriched_tokens[start_tok:end_tok, :]
-                chunks[cid].embedding = torch.mean(token_embeddings, dim=0)
+                token_embeddings = enriched_tokens[start_tok:end_tok, :].to(torch.float32)
+                chunks[cid].embedding = torch.mean(token_embeddings, dim=0).cpu().tolist()
 
 
+    def embed_query(self, query: str) -> list[float]:
+        if len(query) > MAX_QUERY_CHARS:
+            raise ValueError(f"Query exceeds maximum character limit of {MAX_QUERY_CHARS}")
 
+        tokens = self._tokenizer(query, return_tensors="pt")
+        token_ids = tokens["input_ids"].to(self._device)
+        padding_mask = tokens["attention_mask"].to(self._device)
+
+        with torch.no_grad():
+            output = self._model(input_ids=token_ids, attention_mask=padding_mask)
+            enriched_tokens = output.last_hidden_state[0]
+
+        return torch.mean(enriched_tokens, dim=0).to(torch.float32).cpu().tolist()

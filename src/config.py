@@ -3,6 +3,7 @@ Contains constants needed for python files within the src directory
 """
 from docling.datamodel.base_models import DocItemLabel
 import re
+from pathlib import Path
 
 # ------ Block Processing Constants ------
 
@@ -24,6 +25,19 @@ CODE_BLOCK_PATTERN = re.compile(r'```(?:json)?\n?|```')
 # JSON flag from LLM indicating a block should be deleted
 REMOVE_FLAG = 0
 
+# ------ Path Constants ------
+ROOT_DIR = Path(__file__).parent.parent
+DATA_DIR = ROOT_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = str(DATA_DIR / "papers.db")
+
+# ------ DB Constants ------
+CHUNK_TABLE = "chunks"
+VEC_TABLE = "vec"
+PAPER_TABLE = "papers"
+CHUNKS_MATCHED = 5
+MAX_COS_DIST = 0.45
+
 # ------ Semantic Chunker Constants ------
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 MAX_JINA_TOKS = 4096
@@ -31,9 +45,11 @@ MAX_HEADER_CHARS = 250
 MAX_HEADER_STACK_CHARS = 600
 MIN_CHUNK_CHARS = 300
 MAX_CHUNK_CHARS = 1500
+EMBEDDING_DIM=1024
+WS_RE = re.compile(r'.*(\s)')
+MAX_QUERY_CHARS = 1500
 
 # ------ Docling Parser Configurations ------
-
 REFERENCE_HEADERS = [
     "references",
     "bibliography",
@@ -84,7 +100,6 @@ NOISE_REGEX_PATTERNS = [
 ]
 
 # ------ LLM Prompts ------
-
 LLM_CURATION_PROMPT = """
 You are a Data Curation Expert for a Scientific RAG (Retrieval-Augmented Generation) pipeline.
 Your task is to classify text blocks extracted from PDF research papers as either "Signal" (Keep) or "Noise" (Remove).
@@ -122,3 +137,4 @@ Example:
     "45": 1
 }
 """
+
