@@ -2,4 +2,5 @@
 .DS_Store
 test*
 axon-venv
-__pycache__data/
+__pycache__
+data/
