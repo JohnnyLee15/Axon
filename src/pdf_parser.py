@@ -182,12 +182,13 @@ class PdfParser:
 
         tracker.add_block(markdown, item.label.name, self._is_potentially_noise(markdown))
 
-    def _call_curation_llm(self, user_prompt: str) -> dict:
+
+    def _get_noise_blocks(self, batch_text: str) -> list[int]:
         """
-        Sends a text batch to the LLM and returns the parsed JSON curation results.
+        Calls the LLM to identify noisy blocks and returns their integer IDs.
         """
 
-        formatted_prompt = f"### INPUT DATA:\n{user_prompt}"
+        formatted_prompt = f"### INPUT DATA:\n{batch_text}"
 
         try:
             chat_completion = self.client.chat.completions.create(
@@ -196,28 +197,22 @@ class PdfParser:
                     {"role": "user", "content": formatted_prompt}
                 ],
                 model=self.model,
-                response_format={"type": "json_object"},
-                temperature=LLM_CURATION_MODEL_TEMPERATURE
+                temperature=LLM_CURATION_MODEL_TEMPERATURE,
+                tools=[CURATION_TOOL],
+                tool_choice={"type": "function", "function": {"name": "submit_noise_blocks"}}
             )
 
-            response = chat_completion.choices[0].message.content
-            clean_json = CODE_BLOCK_PATTERN.sub('', response).strip()
+            tool_call = chat_completion.choices[0].message.tool_calls[0]
+            raw_args = tool_call.function.arguments
+            console.print("[bold]✅ Curation LLM responded successfully with tool arguments.[/bold]")
 
-            console.print("[bold]✅ LLM responded successfully with JSON data.[/bold]")
-            return json.loads(clean_json)
+            parsed_args = json.loads(raw_args)
+            return parsed_args.get("noise_block_ids", [])
 
         except Exception as e:
-            # Return empty dict to prevent pipeline crashes on API timeouts or malformed JSON
-            console.print(f"[bold]❌ LLM API Error:[/bold] {e}")
-            return {}
-
-    def _get_noise_blocks(self, batch_text: str) -> list[int]:
-        """
-        Calls the LLM to identify noisy blocks and returns their integer IDs.
-        """
-
-        results = self._call_curation_llm(batch_text)
-        return [int(bid) for bid in results if results[bid] == REMOVE_FLAG]
+            # Return empty list to prevent pipeline crashes on API timeouts or malformed JSON
+            console.print(f"[bold]❌ Curation LLM API Error:[/bold] {e}")
+            return []
 
     def _remove_noise_blocks(self, blocks_reg: dict) -> dict:
         """

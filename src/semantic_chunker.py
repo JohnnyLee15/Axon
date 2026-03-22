@@ -14,6 +14,7 @@ from context_buffer_tracker import ContextBufferTracker
 class SemanticChunker:
     def __init__(self):
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
+        # TODO: Implement CPU fallback to int4 or int8 quantization
         self._device = torch.device("mps")
         self._seg = pysbd.Segmenter(language="en", clean=False)
 
