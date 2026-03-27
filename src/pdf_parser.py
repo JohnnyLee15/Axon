@@ -25,8 +25,8 @@ class PdfParser:
     """
 
     def __init__(self) -> None:
-        self.model = LLM_CURATION_MODEL
-        self.client = Groq(api_key=os.environ.get(GROQ_API_KEY))
+        self._model = LLM_CURATION_MODEL
+        self._client = Groq(api_key=os.environ.get(GROQ_API_KEY))
 
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
         device = AcceleratorDevice.MPS
@@ -34,7 +34,7 @@ class PdfParser:
         pipeline_opts = PdfPipelineOptions()
         pipeline_opts.accelerator_options = AcceleratorOptions(device=device)
 
-        self.converter = DocumentConverter(
+        self._converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
             }
@@ -50,7 +50,7 @@ class PdfParser:
         )
 
         start_time = time.perf_counter()
-        doc = self.converter.convert(filepath).document
+        doc = self._converter.convert(filepath).document
         item_iter = iter(doc.iterate_items())
         tracker = BlockTracker()
         processing = True
@@ -191,12 +191,12 @@ class PdfParser:
         formatted_prompt = f"### INPUT DATA:\n{batch_text}"
 
         try:
-            chat_completion = self.client.chat.completions.create(
+            chat_completion = self._client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": LLM_CURATION_PROMPT},
                     {"role": "user", "content": formatted_prompt}
                 ],
-                model=self.model,
+                model=self._model,
                 temperature=LLM_CURATION_MODEL_TEMPERATURE,
                 tools=[CURATION_TOOL],
                 tool_choice={"type": "function", "function": {"name": "submit_noise_blocks"}}

@@ -31,7 +31,7 @@ class VectorDatabase:
         create_vec_table = f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS {VEC_TABLE} USING vec0 (
                 id INTEGER PRIMARY KEY,
-                embedding float[{EMBEDDING_DIM}] distance_metric=cosine
+                embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine
             )
         """
         create_paper_table = f"""

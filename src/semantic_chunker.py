@@ -247,5 +247,6 @@ class SemanticChunker:
         with torch.no_grad():
             output = self._model(input_ids=token_ids, attention_mask=padding_mask)
             enriched_tokens = output.last_hidden_state[0]
+            embedding = torch.mean(enriched_tokens, dim=0).to(torch.float32)
 
-        return torch.mean(enriched_tokens, dim=0).to(torch.float32).cpu().tolist()
+        return embedding.cpu().tolist()
