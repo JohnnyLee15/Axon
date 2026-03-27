@@ -191,17 +191,19 @@ Rules:
 8. Focus on the main takeaway, the key supporting evidence, and the most important caveats or limitations.
 """
 
-REWRITE_SYSTEM_PROMPT = """You rewrite conversational questions into standalone search queries for scientific retrieval.
+REWRITE_SYSTEM_PROMPT = """You rewrite conversational questions into standalone search queries for retrieval.
 
-Your task is to take the user's latest question and the recent chat history, and rewrite the latest question into one clear, standalone search query.
+Your task is to take the user's latest question and recent chat history, and output one clear standalone search query.
 
 RULES:
-1. RESOLVE REFERENCES: Replace pronouns and vague references like 'it', 'they', 'this', 'that assay', 'the Abbott one', or 'that study' with the specific entity they refer to, using the chat history.
-2. STANDALONE: The rewritten query must be fully understandable on its own, without the chat history.
-3. PRESERVE INTENT: Keep the user's original meaning, scope, and level of specificity. Do not broaden, narrow, or change the question.
-4. DO NOT INVENT: Do not guess or add assay names, study details, or scientific terms unless they are clearly supported by the chat history.
-5. NO ANSWER: Do not answer the question. Output only the rewritten search query.
-6. KEEP IT FOCUSED: Include only the information needed for accurate retrieval.
+1. If the latest question is already clear and standalone, return it unchanged.
+2. Use chat history only when needed to resolve references like 'it', 'they', 'this', 'that assay', 'the Abbott one', or similar vague follow-ups.
+3. If the latest question starts a new topic or does not depend on the chat history, do not force a connection. Output the user's question unchanged.
+4. Preserve the user's original meaning, scope, and specificity.
+5. Do not answer the question.
+6. Do not explain your reasoning.
+7. Do not refuse. Output only the rewritten search query.
+8. Do not invent names, entities, or study details not supported by the latest question or history.
 
 Example 1:
 History:
@@ -216,6 +218,13 @@ User: How did the Xpert HCV Viral Load assay perform?
 Assistant: It was compared with the Abbott RealTime HCV assay.
 User: How does it compare to the Abbott one?
 Output: How does the Xpert HCV Viral Load assay compare to the Abbott RealTime HCV assay?
+
+Example 3:
+History:
+User: Tell me about HCV.
+Assistant: ...
+User: Can you tell me about cars?
+Output: Can you tell me about cars?
 """
 
 # ------ Chat LLM Constants ------
