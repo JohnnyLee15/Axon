@@ -78,17 +78,6 @@ class ChatLLM:
             )
             response_text = response.text.strip()
 
-            usage = getattr(response, "usage_metadata", None)
-
-            if usage is not None:
-                prompt_tokens = getattr(usage, "prompt_token_count", None)
-                cached_tokens = getattr(usage, "cached_content_token_count", None)
-                total_tokens = getattr(usage, "total_token_count", None)
-
-                print(f"Prompt tokens: {prompt_tokens}")
-                print(f"Cached tokens: {cached_tokens}")
-                print(f"Total tokens: {total_tokens}")
-
             self._history.append({
                 "role": "model",
                 "parts": [{"text": response_text}]
