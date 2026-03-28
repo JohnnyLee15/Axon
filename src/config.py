@@ -47,7 +47,7 @@ MIN_CHUNK_CHARS = 300
 MAX_CHUNK_CHARS = 1500
 EMBEDDING_DIM=1024
 WS_RE = re.compile(r'.*(\s)')
-MAX_QUERY_CHARS = 10000
+MAX_QUERY_CHARS = 8000
 
 # ------ Docling Parser Configurations ------
 REFERENCE_HEADERS = [
@@ -202,6 +202,8 @@ RULES:
 6. Do not explain your reasoning.
 7. Do not refuse. Output only the rewritten search query.
 8. Do not invent names, entities, or study details not supported by the latest question or history.
+9. The final output must be 8000 characters or fewer.
+10. If needed to stay within the limit, shorten only enough to preserve the user's original meaning, scope, and specificity.
 
 Example 1:
 History:

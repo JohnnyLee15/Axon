@@ -27,10 +27,11 @@ class ChatLLM:
             # TODO: print error
 
     def rewrite_query(self, query: str) -> str:
+        #TODO: Add check to ensure returned query is <-8000 chars
+        #TODO: Change rewriter to attempt rewrite if needed
         recent_turns = self._history[-REWRITE_MESSAGES:]
 
         transcript = ""
-
         for msg in recent_turns:
             role = "User" if msg["role"] == "user" else "Model"
             raw_content = msg["parts"][0]["text"]
