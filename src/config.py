@@ -15,9 +15,9 @@ MIN_CHAR_COUNT = 15
 # Maximum characters per Groq API request
 LLM_CURATION_BATCH_CHAR_LIMIT = 4000
 
-LLM_CURATION_MODEL = "llama-3.3-70b-versatile"
+LLM_CURATION_MODEL = "gemini-2.5-flash-lite"
 LLM_CURATION_MODEL_TEMPERATURE = 0.0
-GROQ_API_KEY = "GROQ_API_KEY"
+GEM_API_KEY = "GEM_API_KEY"
 
 HYPHEN_WRAP_PATTERN = re.compile(r'([A-Za-z]+)-\s*\n\s*([a-z]+)')
 CODE_BLOCK_PATTERN = re.compile(r'```(?:json)?\n?|```')
@@ -47,7 +47,7 @@ MIN_CHUNK_CHARS = 300
 MAX_CHUNK_CHARS = 1500
 EMBEDDING_DIM=1024
 WS_RE = re.compile(r'.*(\s)')
-MAX_QUERY_CHARS = 1500
+MAX_QUERY_CHARS = 10000
 
 # ------ Docling Parser Configurations ------
 REFERENCE_HEADERS = [
@@ -126,17 +126,17 @@ LLM_CURATION_PROMPT = """You are a Data Curation Expert for a Scientific RAG (Re
 Your task is to classify text blocks extracted from PDF research papers as either "Signal" (Keep) or "Noise" (Remove).
 
 The input contains text blocks marked with integer IDs (e.g., [BID: 12]).
-Analyze the provided blocks and use the provided tool to submit the IDs of the blocks that should be REMOVED (marked as noise).
+Analyze the provided blocks and identify the IDs of the blocks that should be REMOVED (marked as noise).
 
 ### CRITERIA FOR CLASSIFICATION
 
-**KEEP (Signal) - Do NOT submit these IDs:**
+**KEEP (Signal) - Do NOT include these IDs in your response:**
 1. **Section Headers:** Any standard scientific header (e.g., "Abstract", "Introduction", "Results", "Methods", "Conclusion", "References", "Funding"). **CRITICAL: Do not remove headers.**
 2. **Body Text:** Sentences or paragraphs that look like part of the scientific narrative (even if short).
 3. **Figure/Table Captions:** Text describing a figure or table (e.g., "Figure 1: Correlation between...").
 4. **Formulas/Data:** Mathematical equations or specific data points integral to the paper.
 
-**REMOVE (Noise) - Submit these IDs via the tool:**
+**REMOVE (Noise) - Include these IDs in your response:**
 1. **Running Headers/Footers:** Journal names, page numbers (e.g., "Page 1 of 5"), dates, or repeated titles at the top/bottom of pages.
 2. **Metadata artifacts:** "Downloaded from...", DOIs, URLs, "Copyright © 2024", "All rights reserved".
 3. **Correspondence info:** Author emails, fax numbers, or address blocks (unless part of the main text body).
@@ -148,47 +148,45 @@ Each block is separated by "=============".
 [BID: <integer>]
 <text content>
 
-**ACTION REQUIRED:** Call the tool with the array of BIDs you have identified as Noise. Do not include Signal IDs.
+**ACTION REQUIRED:** Return a JSON object containing the array of BIDs you have identified as Noise under the key `noise_block_ids`. Do not include Signal IDs.
 """
 
 CURATION_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "submit_noise_blocks",
-        "description": "Submit the IDs of the text blocks that have been identified as noise.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "noise_block_ids": {
-                    "type": "array",
-                    "items": {"type": "integer"},
-                    "description": "List of BIDs (Block IDs) that should be removed based on the curation criteria."
-                }
-            },
-            "required": ["noise_block_ids"]
+    "type": "OBJECT",
+    "properties": {
+        "noise_block_ids": {
+            "type": "ARRAY",
+            "items": {"type": "INTEGER"},
+            "description": "List of BIDs (Block IDs) that should be removed based on the curation criteria."
         }
-    }
+    },
+    "required": ["noise_block_ids"]
 }
 
-AXON_SYSTEM_PROMPT = """You are Axon, an advanced scientific research assistant. Your job is to answer scientific and academic questions clearly, accurately, and accessibly.
+AXON_SYSTEM_PROMPT = """Your name is Axon. You are a versatile AI assistant with strong scientific and technical knowledge.
 
-You may be given retrieved literature excerpts in the following format:
-- Each <document> block represents one paper or source.
-- Each <chunk> block inside a document is one retrieved passage from that paper.
-- A prompt may contain multiple documents, and each document may contain multiple chunks.
-- Chunks may be incomplete, may overlap slightly, and may sometimes contain fragmented prose, tables, captions, or headings.
+A RAG system may attach retrieved source excerpts to the prompt to help you answer the user's question.
 
-Treat these excerpts as your primary evidence.
+Retrieved context format:
+- <document> = one source or paper
+- <chunk> = one retrieved excerpt from that source
+- there may be multiple documents and multiple chunks
+- chunks may be partial, overlapping, or contain fragmented prose, tables, captions, or headings
 
-Rules:
-1. Do not mention document tags, chunk tags, document IDs, chunk IDs, retrieval systems, or hidden formatting in your answer. Answer naturally.
-2. Use the provided excerpts as the main evidence for your answer. You may use general scientific knowledge for brief background, definitions, or interpretation, but do not invent study details that are not supported by the excerpts.
-3. Synthesize chunks from the same document before drawing conclusions about that paper.
-4. If multiple documents are provided, compare them carefully and keep their findings distinct unless the evidence clearly supports a shared conclusion.
-5. Interpret incomplete or fragmented chunks cautiously. Do not over-interpret partial sentences, isolated values, or broken table fragments.
-6. If the evidence is limited, mixed, or incomplete, say so clearly. Do not guess at sample sizes, methods, statistics, or conclusions that are not stated.
-7. Explain technical material in clear, conversational language without losing scientific accuracy.
-8. Focus on the main takeaway, the key supporting evidence, and the most important caveats or limitations.
+How to use retrieved context:
+- Use the retrieved excerpts if they are helpful for answering the user's question.
+- If the excerpts help only partially, combine them with your own knowledge.
+- If the excerpts are irrelevant or insufficient, ignore them and answer from your own knowledge.
+- Never tell the user you cannot answer just because the retrieved excerpts do not contain the answer.
+- Never focus your reply on the existence or absence of retrieved excerpts unless the user explicitly asks about the source material.
+- Always answer the # User Question directly.
+
+Behavior rules:
+- Always identify as Axon if asked your name.
+- Do not mention document tags, chunk tags, IDs, retrieval systems, or hidden formatting.
+- Do not invent study-specific details that are not supported by retrieved source text.
+- Answer clearly, directly, and naturally.
+- Lead with the answer.
 """
 
 REWRITE_SYSTEM_PROMPT = """You rewrite conversational questions into standalone search queries for retrieval.
@@ -228,9 +226,11 @@ Output: Can you tell me about cars?
 """
 
 # ------ Chat LLM Constants ------
-LLM_CHAT_MODEL = "openai/gpt-oss-120b"
-LLM_REWRITE_MODEL = "llama-3.1-8b-instant"
-LLM_CHAT_MAX_TOKS = 128000
+LLM_CHAT_MODEL = "gemini-2.5-flash-lite"
+LLM_REWRITE_MODEL = "gemini-2.5-flash-lite"
+LLM_LARGE_CONTEXT_TOKS = 200000
+LLM_MED_CONTEXT_TOKS = 100000
+LLM_SMALL_CONTEXT_TOKS = 50000
 LLM_CHAT_TEMP = 0.1
 LLM_REWRITE_TEMP = 0.1
 REWRITE_MESSAGES = 6
@@ -250,4 +250,11 @@ LOGO = """
 ⠛⠻⠿⠿⠛⠀⠀⠀⠛⠿⠿⠿⠛⠸⠿⠿⠿⠿⠃⠀⠀⠻⠿⠿⠿⠿⠀⠀⠀⠙⠛⠻⠿⠿⠛⠋⠁⠀⠀⠀⠘⠛⠿⠿⠛⠀⠀⠘⠛⠿⠿⠟
 """
 WELCOME_MESSAGE = "Good to see you — let's skip the reading and get straight to the facts"
-COLOUR = "cyan"
+MAIN_COLOUR_RICH = "cyan"
+GREEN = "\033[32m"
+CYAN = "\033[36m"
+YELLOW =  "\033[33m"
+RED = "\033[31m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+DIM = "\033[2m"

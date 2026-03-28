@@ -5,7 +5,7 @@ import logging
 # Suppress logging
 logging.disable(logging.INFO)
 
-from groq import Groq
+from google import genai
 from docling.datamodel.base_models import DocItemLabel
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
@@ -26,7 +26,7 @@ class PdfParser:
 
     def __init__(self) -> None:
         self._model = LLM_CURATION_MODEL
-        self._client = Groq(api_key=os.environ.get(GROQ_API_KEY))
+        self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
 
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
         device = AcceleratorDevice.MPS
@@ -191,22 +191,19 @@ class PdfParser:
         formatted_prompt = f"### INPUT DATA:\n{batch_text}"
 
         try:
-            chat_completion = self._client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": LLM_CURATION_PROMPT},
-                    {"role": "user", "content": formatted_prompt}
-                ],
+            response = self._client.models.generate_content(
                 model=self._model,
-                temperature=LLM_CURATION_MODEL_TEMPERATURE,
-                tools=[CURATION_TOOL],
-                tool_choice={"type": "function", "function": {"name": "submit_noise_blocks"}}
+                contents=formatted_prompt,
+                config={
+                    "system_instruction": LLM_CURATION_PROMPT,
+                    "temperature": LLM_CURATION_MODEL_TEMPERATURE,
+                    "response_mime_type": "application/json",
+                    "response_schema": CURATION_TOOL
+                }
             )
 
-            tool_call = chat_completion.choices[0].message.tool_calls[0]
-            raw_args = tool_call.function.arguments
             console.print("[bold]✅ Curation LLM responded successfully with tool arguments.[/bold]")
-
-            parsed_args = json.loads(raw_args)
+            parsed_args = json.loads(response.text)
             return parsed_args.get("noise_block_ids", [])
 
         except Exception as e:

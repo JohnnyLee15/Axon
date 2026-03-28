@@ -5,18 +5,27 @@ from rich.table import Table
 from rich.live import Live
 from rich.markdown import Markdown
 from config import *
-import time
 import math
+from prompt_toolkit import prompt
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.formatted_text import ANSI
+import time
 
 class AxonUI:
     def __init__(self):
         # TODO add a name to the database
         self._console = Console()
+        self._kb = KeyBindings()
+
+        @self._kb.add("escape", "enter")
+        def _(event):
+            event.current_buffer.validate_and_handle()
+
         self._init()
 
 
     def _init(self) -> None:
-        logo = Text(LOGO, style=f"bold {COLOUR}")
+        logo = Text(LOGO, style=f"bold {MAIN_COLOUR_RICH}")
         table = Table(box=None, show_header=False, padding=0)
         panel = Panel(
             WELCOME_MESSAGE,
@@ -33,14 +42,24 @@ class AxonUI:
 
 
     def listen(self, curr_tokens: int) -> str:
-        percent_used = math.ceil((curr_tokens / LLM_CHAT_MAX_TOKS) * 100)
-        p_colour = "green" if percent_used < 65 else "yellow" if percent_used < 90 else "red"
-        p_text = f"[[{p_colour}]{percent_used}%][/{p_colour}]"
-        cursor = f"\n{p_text} [bold {COLOUR}][You] >[/bold {COLOUR}] "
-        return self._console.input(cursor).strip()
+        percent_used = math.ceil((curr_tokens / LLM_SMALL_CONTEXT_TOKS) * 100)
+        p_colour = GREEN if percent_used < 65 else YELLOW if percent_used < 90 else RED
+
+        p_text = f"[{p_colour}{percent_used}%{RESET}]"
+        you_text = f"[{CYAN}{BOLD}You{RESET}] {CYAN}{BOLD}>{RESET}"
+        submit_text = f"{DIM}(Esc + Enter to send){RESET}"
+
+        return prompt(
+            ANSI(f"\n{p_text} {you_text} {submit_text} "),
+            multiline=True,
+            key_bindings=self._kb,
+            wrap_lines=True,
+            prompt_continuation=lambda prompt_width, line_number, wrap_count: ""
+        ).strip()
 
 
     def wait(self):
+        self._console.print()
         return self._console.status(
             "[bold white]Thinking...[/bold white]",
             spinner="dots",
@@ -49,7 +68,7 @@ class AxonUI:
 
 
     def stream_response(self, response: str) -> None:
-        self._console.print(f"\n[bold white][Axon] > [/bold white]")
+        self._console.print(f"[bold white][Axon] > [/bold white]")
         display_text = ""
 
         with Live(
