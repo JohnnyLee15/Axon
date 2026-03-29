@@ -228,7 +228,7 @@ Output: Can you tell me about cars?
 """
 
 # ------ Chat LLM Constants ------
-LLM_CHAT_MODEL = "gemini-2.5-flash-lite"
+LLM_CHAT_MODEL_DEFAULT = "gemini-2.5-flash-lite"
 LLM_REWRITE_MODEL = "gemini-2.5-flash-lite"
 LLM_LARGE_CONTEXT_TOKS = 200000
 LLM_MED_CONTEXT_TOKS = 100000
@@ -236,10 +236,14 @@ LLM_SMALL_CONTEXT_TOKS = 50000
 LLM_CHAT_TEMP = 0.1
 LLM_REWRITE_TEMP = 0.1
 REWRITE_MESSAGES = 6
-USER_HEADER = "# User Question"
-NO_CHUNKS_TEXT = "No relevant excerpts were retrieved for this question."
+LLMS = [
+    {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (lowest cost, lightest quality)"},
+    {"id": "gemini-2.5-flash", "label": "gemini-2.5-flash (balanced quality/cost)"},
+    {"id": "gemini-2.5-pro", "label": "gemini-2.5-pro (best quality, highest cost)"},
+]
 
-# ------ Interface Constants ------
+
+# ------ UI Constants ------
 LOGO = """
 ⠀⠀⠀⣤⣤⣤⣤⣤⣤⣤⠀⠀⠀⢠⣤⣤⣤⣤⡀⠀⠀⣠⣤⣤⣤⣤⠀⠀⠀⢀⣀⣤⣤⣤⣄⣀⠀⠀⠀⠀⢠⣤⣤⣤⣄⠀⠀⢠⣤⣤⣤⣤
 ⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠘⣿⣿⣿⣿⣧⠀⢰⣿⣿⣿⣿⡏⠀⢀⣴⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⢸⣿⣿⣿⣿⣆⠀⢸⣿⣿⣿⣿
@@ -260,3 +264,5 @@ RED = "\033[31m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 DIM = "\033[2m"
+REVERSE = "\033[7m"
+

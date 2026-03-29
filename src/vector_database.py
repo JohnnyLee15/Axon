@@ -55,17 +55,17 @@ class VectorDatabase:
             conn.close()
 
 
-    def drop_all(self) -> None:
+    def clear(self) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
-        drop_papers = f"DROP TABLE IF EXISTS {PAPER_TABLE}"
-        drop_chunks = f"DROP TABLE IF EXISTS {CHUNK_TABLE}"
-        drop_vec = f"DROP TABLE IF EXISTS {VEC_TABLE}"
+        clear_vec = f"DELETE FROM {VEC_TABLE}"
+        clear_chunks = f"DELETE FROM {CHUNK_TABLE}"
+        clear_papers = f"DELETE FROM {PAPER_TABLE}"
 
         try:
-            cursor.execute(drop_vec)
-            cursor.execute(drop_chunks)
-            cursor.execute(drop_papers)
+            cursor.execute(clear_vec)
+            cursor.execute(clear_chunks)
+            cursor.execute(clear_papers)
             conn.commit()
 
         except sqlite3.Error as e:
@@ -75,11 +75,6 @@ class VectorDatabase:
         finally:
             cursor.close()
             conn.close()
-
-
-    def reset_db(self) -> None:
-        self.drop_all()
-        self._init_db()
 
 
     def create_paper(self) -> int:

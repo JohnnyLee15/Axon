@@ -10,21 +10,19 @@ from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import ANSI
 import time
+from select_menu import SelectMenu
 
 class AxonUI:
     def __init__(self):
         # TODO add a name to the database
         self._console = Console()
+        self._select_menu = SelectMenu()
         self._kb = KeyBindings()
-
-        @self._kb.add("escape", "enter")
-        def _(event):
-            event.current_buffer.validate_and_handle()
-
-        self._init()
+        self._bind_keys()
+        self._display_welcome()
 
 
-    def _init(self) -> None:
+    def _display_welcome(self) -> None:
         logo = Text(LOGO, style=f"bold {MAIN_COLOUR_RICH}")
         table = Table(box=None, show_header=False, padding=0)
         panel = Panel(
@@ -39,6 +37,12 @@ class AxonUI:
         table.add_row(logo)
         table.add_row(panel)
         self._console.print(table)
+
+
+    def _bind_keys(self) -> None:
+        @self._kb.add("escape", "enter")
+        def _(event):
+            event.current_buffer.validate_and_handle()
 
 
     def listen(self, curr_tokens: int) -> str:
@@ -79,3 +83,7 @@ class AxonUI:
                 display_text += char
                 live.update(Markdown(display_text))
                 time.sleep(0.001)
+
+
+    def select_item(self, items: list[str]) -> str:
+        return self._select_menu.select_item(items)

@@ -1,13 +1,18 @@
 from config import *
 import os
 from google import genai
+import textwrap
 
 class ChatLLM:
     def __init__(self):
-        self._chat_model = LLM_CHAT_MODEL
+        self._chat_model = LLM_CHAT_MODEL_DEFAULT
         self._rewrite_model = LLM_REWRITE_MODEL
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
         self._history = []
+
+
+    def set_chat_llm(self, model: str) -> None:
+        self._chat_model = model
 
 
     def get_token_count(self, history: list[dict[str, str]] | None = None) -> int:
@@ -26,6 +31,7 @@ class ChatLLM:
             pass
             # TODO: print error
 
+
     def rewrite_query(self, query: str) -> str:
         #TODO: Add check to ensure returned query is <-8000 chars
         #TODO: Change rewriter to attempt rewrite if needed
@@ -34,9 +40,8 @@ class ChatLLM:
         transcript = ""
         for msg in recent_turns:
             role = "User" if msg["role"] == "user" else "Model"
-            raw_content = msg["parts"][0]["text"]
-            clean_content = raw_content.split(USER_HEADER)[-1].strip()
-            transcript += f"{role}: {clean_content}\n"
+            content = msg["parts"][0]["text"]
+            transcript += f"{role}: {content}\n"
 
         user_content = f"History:\n{transcript.strip()}\n\nNew Question:\n{query}"
         try:
@@ -54,37 +59,59 @@ class ChatLLM:
             return query
 
 
-    def query_chat(self, query: str) -> str:
+    def _construct_query(self, chunks: str | None, user_input: str) -> str:
+        if not chunks:
+            return user_input
+
+        return textwrap.dedent(f"""
+            Retrieved Excerpts:
+            {chunks}
+
+            User Question:
+            {user_input}
+        """).strip()
+
+
+    def _add_history(self, user_input: str, response: str) -> None:
+        self._history.append({
+            "role": "user",
+            "parts": [{"text": user_input}]
+        })
+        self._history.append({
+            "role": "model",
+            "parts": [{"text": response}]
+        })
+
+
+    def query_chat(self, user_input: str, chunks: str | None) -> str:
         new_message = {
             "role": "user",
-            "parts": [{"text": query}]
+            "parts": [{"text": self._construct_query(chunks, user_input)}]
         }
 
-        projected_history = self._history + [new_message]
-        projected_len = self.get_token_count(projected_history)
+        payload= self._history + [new_message]
+        payload_len = self.get_token_count(payload)
 
-        if projected_len > LLM_SMALL_CONTEXT_TOKS:
+        if payload_len > LLM_SMALL_CONTEXT_TOKS:
             pass
             # TODO: return error message
 
-        self._history = projected_history
         try:
             response = self._client.models.generate_content(
                 model=self._chat_model,
-                contents=self._history,
+                contents=payload,
                 config={
                     "system_instruction": AXON_SYSTEM_PROMPT,
                     "temperature": LLM_CHAT_TEMP
                 }
             )
-            response_text = response.text.strip()
 
-            self._history.append({
-                "role": "model",
-                "parts": [{"text": response_text}]
-            })
+            response_text = response.text.strip()
+            self._add_history(user_input, response_text)
             return response_text
 
         except Exception as e:
             pass
             # TODO: return error message
+
+
