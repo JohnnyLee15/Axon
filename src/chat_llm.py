@@ -1,7 +1,6 @@
 from config import *
 import os
 from google import genai
-import textwrap
 
 class ChatLLM:
     def __init__(self):
@@ -63,13 +62,7 @@ class ChatLLM:
         if not chunks:
             return user_input
 
-        return textwrap.dedent(f"""
-            Retrieved Excerpts:
-            {chunks}
-
-            User Question:
-            {user_input}
-        """).strip()
+        return f"Retrieved Excerpts:\n{chunks}\n\nUser Question:\n{user_input}".strip()
 
 
     def _add_history(self, user_input: str, response: str) -> None:

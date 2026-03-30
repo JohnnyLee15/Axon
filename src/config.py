@@ -255,7 +255,8 @@ LOGO = """
 ⣸⣿⣿⣿⣿⠋⠉⠙⣿⣿⣿⣿⣧⢠⣿⣿⣿⣿⡿⠀⢸⣿⣿⣿⣿⣇⠀⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠀⠀⢸⣿⣿⣿⣿⠀⠈⣿⣿⣿⣿⣿
 ⠛⠻⠿⠿⠛⠀⠀⠀⠛⠿⠿⠿⠛⠸⠿⠿⠿⠿⠃⠀⠀⠻⠿⠿⠿⠿⠀⠀⠀⠙⠛⠻⠿⠿⠛⠋⠁⠀⠀⠀⠘⠛⠿⠿⠛⠀⠀⠘⠛⠿⠿⠟
 """
-WELCOME_MESSAGE = "Good to see you — let's skip the reading and get straight to the facts"
+WELCOME_MESSAGE = """Good to see you — let's skip the reading and get straight to the facts
+[dim](Tip: Enter to send | Esc + Enter for a newline)[/dim]"""
 MAIN_COLOUR_RICH = "cyan"
 GREEN = "\033[32m"
 CYAN = "\033[36m"

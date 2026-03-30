@@ -95,6 +95,12 @@ class SessionManager:
                 "desc": "Safely shuts down Axon and exits.",
                 "argc": 0,
                 "run": self._exit
+            },
+            "help": {
+                "usage": "/help",
+                "desc": "Print a menu listing all available commands.",
+                "argc": 0,
+                "run": self._help
             }
         }
 
@@ -102,6 +108,8 @@ class SessionManager:
     def _save_chat(self):
         pass
 
+    def _help(self):
+        pass
 
     def _load_chat(self):
         pass

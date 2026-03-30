@@ -40,9 +40,13 @@ class AxonUI:
 
 
     def _bind_keys(self) -> None:
-        @self._kb.add("escape", "enter")
+        @self._kb.add("enter")
         def _(event):
             event.current_buffer.validate_and_handle()
+
+        @self._kb.add("escape", "enter")
+        def _(event):
+            event.current_buffer.insert_text('\n')
 
 
     def listen(self, curr_tokens: int) -> str:
@@ -51,10 +55,9 @@ class AxonUI:
 
         p_text = f"[{p_colour}{percent_used}%{RESET}]"
         you_text = f"[{CYAN}{BOLD}You{RESET}] {CYAN}{BOLD}>{RESET}"
-        submit_text = f"{DIM}(Esc + Enter to send){RESET}"
 
         return prompt(
-            ANSI(f"\n{p_text} {you_text} {submit_text} "),
+            ANSI(f"\n{p_text} {you_text} "),
             multiline=True,
             key_bindings=self._kb,
             wrap_lines=True,
@@ -65,15 +68,14 @@ class AxonUI:
     def wait(self):
         self._console.print()
         return self._console.status(
-            "[bold white]Thinking...[/bold white]",
+            "[bold]Thinking...[/bold]",
             spinner="dots",
-            spinner_style="bold white"
+            spinner_style="bold"
         )
 
 
     def stream_response(self, response: str) -> None:
-        self._console.print(f"[bold white][Axon] > [/bold white]")
-        display_text = ""
+        display_text = "**[Axon] >** "
 
         with Live(
             console=self._console,
