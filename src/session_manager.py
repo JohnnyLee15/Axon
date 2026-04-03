@@ -239,7 +239,7 @@ class SessionManager:
             correct_num_args = len(args) == cmd_args
 
         if not correct_num_args:
-            self._console.print(f"\n[bold red]Invalid number of arguments.[/bold red] Usage: {cmd_data['usage']}")
+            self._console.print(f"\n❌ [bold red]Invalid number of arguments.[/bold red] Usage: {cmd_data['usage']}")
             return False
 
         result = cmd_data["run"](*args)
