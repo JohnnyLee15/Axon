@@ -2,9 +2,12 @@ import sqlite3
 import sqlite_vec
 from config import *
 from chunk_tracker import Chunk
+import json
+from rich.console import Console
 
 class VectorDatabase:
     def __init__(self) -> None:
+        self._console = Console()
         self._init_db()
 
 
@@ -39,16 +42,23 @@ class VectorDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT
             )
         """
+        create_chats_table = f"""
+            CREATE TABLE IF NOT EXISTS {CHAT_TABLE} (
+                name TEXT PRIMARY KEY,
+                chat_content TEXT
+            )
+        """
 
         try:
             cursor.execute(create_paper_table)
             cursor.execute(create_chunks_table)
             cursor.execute(create_vec_table)
+            cursor.execute(create_chats_table)
             conn.commit()
 
         except sqlite3.Error as e:
             conn.rollback()
-            print(f"Error creating database tables: {e}")
+            self._console.print(f"\n🏗️ [bold red]Error creating database tables: {e}[/bold red]")
 
         finally:
             cursor.close()
@@ -56,6 +66,8 @@ class VectorDatabase:
 
 
     def clear(self) -> None:
+        #TODO: Figure our what clear means, do we also clear chats?
+        # Best is probably db clear papers and db remove chat --all
         conn = self._get_connection()
         cursor = conn.cursor()
         clear_vec = f"DELETE FROM {VEC_TABLE}"
@@ -68,9 +80,11 @@ class VectorDatabase:
             cursor.execute(clear_papers)
             conn.commit()
 
+            cursor.execute("VACUUM")
+
         except sqlite3.Error as e:
             conn.rollback()
-            print(f"Error dropping tables during reset: {e}")
+            self._console.print(f"\n🧹 [bold red]Error dropping tables during database clear: {e}[/bold red]")
 
         finally:
             cursor.close()
@@ -90,7 +104,7 @@ class VectorDatabase:
 
         except sqlite3.Error as e:
             conn.rollback()
-            print(f"Error creating new paper: {e}")
+            self._console.print(f"\n📄 [bold red]Error creating new paper: {e}[/bold red]")
             return -1
 
         finally:
@@ -134,11 +148,69 @@ class VectorDatabase:
 
         except sqlite3.Error as e:
             conn.rollback()
-            print(f"Error inserting chunk into database: {e}")
+            self._console.print(f"\n🧩 [bold red]Error inserting chunk into database: {e}[/bold red]")
 
         finally:
             cursor.close()
             conn.close()
+
+
+    def insert_chat(
+        self,
+        name: str,
+        contents: list[dict[str, str]],
+        overwrite: bool = False
+    ) -> None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if overwrite:
+            prefix = "INSERT OR REPLACE"
+        else:
+            prefix = "INSERT"
+
+        sql = f"""
+            {prefix} INTO {CHAT_TABLE} (
+                name,
+                chat_content
+            )
+            VALUES (?, ?)
+        """
+        try:
+            cursor.execute(sql, (name, json.dumps(contents)))
+            conn.commit()
+
+        except Exception as e:
+            if not isinstance(e, sqlite3.IntegrityError):
+                self._console.print(f"\n💾 [bold red]Error saving chat [cyan]\"{name}\"[/cyan]: {e}[/bold red]")
+
+            raise e
+
+        finally:
+            cursor.close()
+            conn.close()
+
+
+    def get_chat(self, name: str) -> list[dict[str, str]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        sql = f"SELECT chat_content FROM {CHAT_TABLE} WHERE name = ?"
+
+        try:
+            cursor.execute(sql,(name, ))
+            row = cursor.fetchone()
+
+            if row:
+                return json.loads(row[0])
+
+        except Exception as e:
+            self._console.print(f"\n📂 [bold red]Error retrieving chat [cyan]\"{name}\"[/cyan]: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return None
 
 
     def _get_top_k_chunks(self, query_embedding: list[float]) -> list[tuple]:
@@ -168,7 +240,7 @@ class VectorDatabase:
             rows = cursor.fetchall()
 
         except sqlite3.Error as e:
-            print(f"Error retrieving top {CHUNKS_MATCHED} chunks: {e}")
+            self._console.print(f"\n🔍 [bold red]Error retrieving top {CHUNKS_MATCHED} chunks: {e}[/bold red]")
 
         finally:
             cursor.close()

@@ -4,6 +4,7 @@ from rich.text import Text
 from rich.table import Table
 from rich.live import Live
 from rich.markdown import Markdown
+from rich import box
 from config import *
 import math
 from prompt_toolkit import prompt
@@ -46,11 +47,11 @@ class AxonUI:
 
         @self._kb.add("escape", "enter")
         def _(event):
-            event.current_buffer.insert_text('\n')
+            event.current_buffer.insert_text("\n")
 
 
-    def listen(self, curr_tokens: int) -> str:
-        percent_used = math.ceil((curr_tokens / LLM_SMALL_CONTEXT_TOKS) * 100)
+    def listen(self, curr_tokens: int, context_size: int) -> str:
+        percent_used = math.ceil((curr_tokens / context_size) * 100)
         p_colour = GREEN if percent_used < 65 else YELLOW if percent_used < 90 else RED
 
         p_text = f"[{p_colour}{percent_used}%{RESET}]"
@@ -89,3 +90,39 @@ class AxonUI:
 
     def select_item(self, items: list[str]) -> str:
         return self._select_menu.select_item(items)
+
+
+    def display_help(self, commands: dict) -> None:
+        table = Table(
+            title="🧠 [bold]Axon Command Menu[/bold]",
+            expand=False,
+            header_style="bold",
+            box=box.ROUNDED,
+            padding=(0,2)
+        )
+        table.add_column("Command", style="bold cyan")
+        table.add_column("Description")
+
+        base_cmds = []
+        grouped_cmds = {}
+
+        for cmd in commands:
+            item = commands[cmd]
+            if "subcommands" in item:
+                grouped_cmds[cmd] = item["subcommands"]
+            else:
+                base_cmds.append(item)
+
+        for cmd in base_cmds:
+            table.add_row(cmd["usage"], cmd["desc"])
+
+        for cmd in grouped_cmds:
+            sub_cmds = grouped_cmds[cmd]
+            table.add_section()
+
+            for sub_cmd in sub_cmds:
+                props = sub_cmds[sub_cmd]
+                table.add_row(props["usage"], props["desc"])
+
+        self._console.print()
+        self._console.print(table)

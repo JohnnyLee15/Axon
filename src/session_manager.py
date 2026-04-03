@@ -5,7 +5,9 @@ from axon_ui import AxonUI
 from chat_llm import ChatLLM
 from config import *
 from rich.console import Console
-
+from typing import Any
+import os
+import sqlite3
 
 class SessionManager:
     def __init__(self):
@@ -18,13 +20,13 @@ class SessionManager:
 
         self._CHAT_COMMANDS = {
             "save": {
-                "usage": "/chat save <file path>",
-                "desc": "Saves the current chat history to disk.",
-                "argc": 1,
+                "usage": "/chat save <chat name> [-f]",
+                "desc": "Saves the current chat history to disk. use -f to overwrite.",
+                "argc": [1,2],
                 "run": self._save_chat
             },
             "load": {
-                "usage": "/chat load <file path>",
+                "usage": "/chat load <chat name>",
                 "desc": "Loads a previously saved chat history.",
                 "argc": 1,
                 "run": self._load_chat
@@ -54,13 +56,14 @@ class SessionManager:
                 "run": self._auto_compact
             }
             #TODO: add /chat roll
+            #TODO: add /chat list
         }
 
         self._DB_COMMANDS = {
             "load": {
                 "usage": "/db load <file path>",
                 "desc": "Loads a file or folder (and subfolders) of PDFs into the database.",
-                "argc": 0,
+                "argc": 1,
                 "run": self._load_pdfs
             },
             "clear": {
@@ -105,48 +108,97 @@ class SessionManager:
         }
 
 
-    def _save_chat(self):
-        pass
+    def _select_item_from_id_dict(self, id_dicts: list[dict[str, str]]) -> Any:
+        model_labels = [item["label"] for item in id_dicts]
+        label_to_id = {item["label"]: item["id"] for item in id_dicts}
+        return label_to_id[self._ui.select_item(model_labels)]
 
-    def _help(self):
-        pass
 
-    def _load_chat(self):
-        pass
+    def _help(self) -> None:
+        self._ui.display_help(self._COMMANDS)
+
+
+    def _save_chat(self, name: str, flag: str | None = None):
+        name = name.strip()
+        overwrite = False
+
+        if flag:
+            if flag.strip() == "-f":
+                overwrite = True
+            else:
+                self._console.print(
+                    f"\n❓ [bold red]Unknown flag:[/bold red] [bold cyan]\"{flag}\"[/bold cyan]. "
+                    "Did you mean [bold cyan]\"-f\"[/bold cyan]?"
+                )
+                return
+
+        try:
+            self._db.insert_chat(name, self._llm.get_history(), overwrite)
+            self._console.print(f"\n💾 [bold]Chat saved as [cyan]\"{name}\"[/cyan]![/bold]")
+
+        except sqlite3.IntegrityError:
+            self._console.print(f"\n⚠️  [bold yellow]Chat [bold cyan]\"{name}\"[/bold cyan] already exists! No chats saved.[/bold yellow]")
+            self._console.print(f"Use [bold cyan]/chat save {name} -f[/bold cyan] to overwrite.")
+
+
+    def _load_chat(self, name: str):
+        name = name.strip()
+        history = self._db.get_chat(name)
+
+        if history is None:
+            self._console.print(f"\n🔍 [bold yellow]Chat [bold cyan]\"{name}\"[/bold cyan] not found. No chats loaded.[/bold yellow]")
+            return
+
+        self._llm.set_history(history)
+        self._console.print(f"\n📖 [bold]Successfully loaded chat history from [cyan]\"{name}\"[/cyan]![/bold]")
+
 
     def _clear_chat(self):
-        pass
+        self._llm.clear_history()
+        self._console.print("\n🧹 [bold]Chat history cleared![/bold]")
 
-    def _set_limit(self):
-        pass
+
+    def _set_limit(self) -> None:
+        selected_limit = self._select_item_from_id_dict(CHAT_LIMITS)
+        self._llm.set_chat_limit(selected_limit)
+        self._console.print(f"\n📏 [bold]Chat Context Limit:[/bold] {selected_limit}")
+
 
     def _load_pdfs(self):
         pass
 
+
     def _clear_db(self):
-        pass
+        self._db.clear()
+        self._console.print("\n🗑️  [bold]Vector database cleared![/bold]")
+
 
     def _clear_screen(self):
-        pass
+        os.system("cls" if os.name == "nt" else "clear")
+
 
     def _exit(self):
+        self._console.print("\n👋 [bold]Shutting down Axon. Goodbye![/bold]")
         return True
+
 
     def _compact(self):
         pass
 
+
     def _auto_compact(self):
         pass
 
-    def _select_model(self):
-        model_labels = [model["label"] for model in LLMS]
-        label_to_id = {model["label"]: model["id"] for model in LLMS}
-        selected_model = label_to_id[self._ui.select_item(model_labels)]
+
+    def _select_model(self) -> None:
+        selected_model = self._select_item_from_id_dict(LLMS)
         self._llm.set_chat_llm(selected_model)
         self._console.print(f"\n🤖 [bold]Using Model:[/bold] {selected_model}")
 
+
     # def _chat_roll(self):
     #     pass
+
 
     def _process_cmd(self, cmd: str) -> bool:
         cmd = cmd.lstrip("/")
@@ -168,7 +220,7 @@ class SessionManager:
 
         if invalid_command:
             self._console.print(
-                f"\nUnknown command: '{cmd}'. "
+                f"\n❓ [bold red]Unknown command:[/bold red] [bold cyan]\"{cmd}\"[/bold cyan]. "
                 "Type [bold cyan]/help[/bold cyan] for a list of available commands."
             )
             return False
@@ -180,18 +232,26 @@ class SessionManager:
             cmd_data = self._COMMANDS[base]
             args = parts[1:]
 
-        if len(args) != cmd_data["argc"]:
-            self._console.print(f"\nInvalid number of arguments. Usage: {cmd_data['usage']}")
+        cmd_args = cmd_data["argc"]
+        if isinstance(cmd_args, list):
+            correct_num_args = len(args) in cmd_args
+        else:
+            correct_num_args = len(args) == cmd_args
+
+        if not correct_num_args:
+            self._console.print(f"\n[bold red]Invalid number of arguments.[/bold red] Usage: {cmd_data['usage']}")
             return False
 
-        return cmd_data["run"](*args)
+        result = cmd_data["run"](*args)
+
+        return result if result is not None else False
 
 
     def run(self) -> None:
         done = False
         while not done:
             curr_tokens = self._llm.get_token_count()
-            user_input = self._ui.listen(curr_tokens)
+            user_input = self._ui.listen(curr_tokens, self._llm.get_chat_limit())
             if not user_input:
                 continue
 

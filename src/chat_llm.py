@@ -5,6 +5,7 @@ from google import genai
 class ChatLLM:
     def __init__(self):
         self._chat_model = LLM_CHAT_MODEL_DEFAULT
+        self._context_size = LLM_CONTEXT_SIZE_DEFAULT
         self._rewrite_model = LLM_REWRITE_MODEL
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
         self._history = []
@@ -12,6 +13,26 @@ class ChatLLM:
 
     def set_chat_llm(self, model: str) -> None:
         self._chat_model = model
+
+
+    def set_chat_limit(self, limit: int) -> None:
+        self._context_size = limit
+
+
+    def get_chat_limit(self) -> int:
+        return self._context_size
+
+
+    def clear_history(self) -> None:
+        self._history = []
+
+
+    def get_history(self) -> list[dict[str, str]]:
+        return self._history
+
+
+    def set_history(self, history: list[dict[str, str]]) -> None:
+        self._history = history
 
 
     def get_token_count(self, history: list[dict[str, str]] | None = None) -> int:
@@ -85,7 +106,7 @@ class ChatLLM:
         payload= self._history + [new_message]
         payload_len = self.get_token_count(payload)
 
-        if payload_len > LLM_SMALL_CONTEXT_TOKS:
+        if payload_len > self._context_size:
             pass
             # TODO: return error message
 

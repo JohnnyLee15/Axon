@@ -35,6 +35,7 @@ DB_PATH = str(DATA_DIR / "papers.db")
 CHUNK_TABLE = "chunks"
 VEC_TABLE = "vec"
 PAPER_TABLE = "papers"
+CHAT_TABLE = "chats"
 CHUNKS_MATCHED = 5
 MAX_COS_DIST = 0.45
 
@@ -230,16 +231,24 @@ Output: Can you tell me about cars?
 # ------ Chat LLM Constants ------
 LLM_CHAT_MODEL_DEFAULT = "gemini-2.5-flash-lite"
 LLM_REWRITE_MODEL = "gemini-2.5-flash-lite"
-LLM_LARGE_CONTEXT_TOKS = 200000
-LLM_MED_CONTEXT_TOKS = 100000
-LLM_SMALL_CONTEXT_TOKS = 50000
+LLM_CONTEXT_SIZE_DEFAULT = 10000
 LLM_CHAT_TEMP = 0.1
 LLM_REWRITE_TEMP = 0.1
 REWRITE_MESSAGES = 6
 LLMS = [
-    {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (lowest cost, lightest quality)"},
-    {"id": "gemini-2.5-flash", "label": "gemini-2.5-flash (balanced quality/cost)"},
-    {"id": "gemini-2.5-pro", "label": "gemini-2.5-pro (best quality, highest cost)"},
+    {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (cheapest | quality #6)"},
+    {"id": "gemini-2.5-flash", "label": "gemini-2.5-flash (low cost | quality #5)"},
+    {"id": "gemini-3.1-flash-lite-preview", "label": "gemini-3.1-flash-lite-preview (budget | quality #4)"},
+    {"id": "gemini-3-flash-preview", "label": "gemini-3-flash-preview (mid cost | quality #3)"},
+    {"id": "gemini-2.5-pro", "label": "gemini-2.5-pro (high cost | quality #2)"},
+    {"id": "gemini-3.1-pro-preview", "label": "gemini-3.1-pro-preview (most expensive | quality #1)"},
+]
+CHAT_LIMITS = [
+    {"id": 10000, "label": "10,000 (small)"},
+    {"id": 20000, "label": "20,000 (short)"},
+    {"id": 50000, "label": "50,000 (medium)"},
+    {"id": 100000, "label": "100,000 (large)"},
+    {"id": 200000, "label": "200,000 (max)"},
 ]
 
 
@@ -255,8 +264,10 @@ LOGO = """
 ⣸⣿⣿⣿⣿⠋⠉⠙⣿⣿⣿⣿⣧⢠⣿⣿⣿⣿⡿⠀⢸⣿⣿⣿⣿⣇⠀⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠀⠀⢸⣿⣿⣿⣿⠀⠈⣿⣿⣿⣿⣿
 ⠛⠻⠿⠿⠛⠀⠀⠀⠛⠿⠿⠿⠛⠸⠿⠿⠿⠿⠃⠀⠀⠻⠿⠿⠿⠿⠀⠀⠀⠙⠛⠻⠿⠿⠛⠋⠁⠀⠀⠀⠘⠛⠿⠿⠛⠀⠀⠘⠛⠿⠿⠟
 """
-WELCOME_MESSAGE = """Good to see you — let's skip the reading and get straight to the facts
-[dim](Tip: Enter to send | Esc + Enter for a newline)[/dim]"""
+WELCOME_MESSAGE = """Good to see you — let's skip the reading and get straight to the facts.
+Type [bold cyan]/help[/bold cyan] at any time to see available commands.
+
+[dim](Tip: Enter to send | Esc + Enter for newline)[/dim]"""
 MAIN_COLOUR_RICH = "cyan"
 GREEN = "\033[32m"
 CYAN = "\033[36m"

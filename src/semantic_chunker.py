@@ -2,6 +2,10 @@
 import logging
 logging.disable(logging.INFO)
 
+# Suppress irrelevant warnings
+import transformers
+transformers.logging.set_verbosity_error()
+
 from config import *
 import torch
 import pysbd
