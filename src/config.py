@@ -228,12 +228,62 @@ User: Can you tell me about cars?
 Output: Can you tell me about cars?
 """
 
+COMPACT_SYSTEM_PROMPT = """You are compressing a long chat history into a single self-contained memory summary that will replace the original conversation.
+
+Your goal is to preserve everything important so a future assistant can continue the conversation with minimal loss of context.
+
+Summarize the conversation into a dense but readable structured record.
+
+Requirements:
+1. Preserve concrete facts, decisions, conclusions, preferences, constraints, instructions, plans, and unresolved questions.
+2. Preserve important technical context such as code architecture, class names, function names, variables, command behavior, database design ideas, file formats, and implementation decisions.
+3. Preserve any user preferences about style, formatting, verbosity, coding style, naming, workflow, or output expectations.
+4. Preserve task progress clearly: what has already been completed, what is partially done, what is planned next, and what was intentionally postponed.
+5. Preserve references to any important files, documents, prompts, schemas, commands, or tools mentioned in the conversation.
+6. Preserve important examples, edge cases, caveats, and tradeoffs that were discussed.
+7. Separate confirmed decisions from tentative ideas or open questions.
+8. Do not include filler, conversational pleasantries, or repetition.
+9. Do not invent missing details. If something was uncertain, mark it as uncertain.
+10. Write the summary so that someone who never saw the original chat can immediately understand the full working context.
+
+Output format:
+Return the summary using exactly these sections:
+
+OVERVIEW
+A concise description of the overall project or discussion.
+
+USER GOALS
+The user’s current goals and priorities.
+
+IMPORTANT FACTS AND CONTEXT
+Key factual background, assumptions, and constraints.
+
+TECHNICAL STATE
+Relevant architecture, code structure, data structures, commands, prompts, configuration, and implementation details.
+
+DECISIONS MADE
+Confirmed decisions and chosen approaches.
+
+OPEN QUESTIONS / UNRESOLVED ITEMS
+Anything still undecided, risky, blocked, or needing future work.
+
+ACTIVE TASKS / NEXT STEPS
+What should likely happen next.
+
+USER PREFERENCES
+Important preferences about writing, coding, formatting, workflow, or interaction style.
+
+Be maximally information-dense while staying clear and organized.
+"""
+
 # ------ Chat LLM Constants ------
 LLM_CHAT_MODEL_DEFAULT = "gemini-2.5-flash-lite"
 LLM_REWRITE_MODEL = "gemini-2.5-flash-lite"
+LLM_COMPACT_MODEL = "gemini-2.5-flash-lite"
 LLM_CONTEXT_SIZE_DEFAULT = 10000
 LLM_CHAT_TEMP = 0.1
 LLM_REWRITE_TEMP = 0.1
+LLM_COMPACT_TEMP = 0.0
 REWRITE_MESSAGES = 6
 LLMS = [
     {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (cheapest | quality #6)"},

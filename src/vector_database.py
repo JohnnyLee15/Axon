@@ -66,18 +66,18 @@ class VectorDatabase:
 
 
     def clear(self) -> None:
-        #TODO: Figure our what clear means, do we also clear chats?
-        # Best is probably db clear papers and db remove chat --all
         conn = self._get_connection()
         cursor = conn.cursor()
         clear_vec = f"DELETE FROM {VEC_TABLE}"
         clear_chunks = f"DELETE FROM {CHUNK_TABLE}"
         clear_papers = f"DELETE FROM {PAPER_TABLE}"
+        clear_chats = f"DELETE FROM {CHAT_TABLE}"
 
         try:
             cursor.execute(clear_vec)
             cursor.execute(clear_chunks)
             cursor.execute(clear_papers)
+            cursor.execute(clear_chats)
             conn.commit()
 
             cursor.execute("VACUUM")
@@ -181,6 +181,7 @@ class VectorDatabase:
             conn.commit()
 
         except Exception as e:
+            conn.rollback()
             if not isinstance(e, sqlite3.IntegrityError):
                 self._console.print(f"\n💾 [bold red]Error saving chat [cyan]\"{name}\"[/cyan]: {e}[/bold red]")
 
@@ -189,6 +190,51 @@ class VectorDatabase:
         finally:
             cursor.close()
             conn.close()
+
+
+    def delete_chat(self, chat: str) -> bool:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        sql = f"DELETE FROM {CHAT_TABLE} WHERE name = ?"
+
+        try:
+            cursor.execute(sql, (chat,))
+            if cursor.rowcount == 0:
+                return False
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            self._console.print(f"\n📂 [bold red]Error deleting chat [cyan]\"{chat}\"[/cyan]: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return False
+
+
+    def delete_all_chats(self) -> bool:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        sql = f"DELETE FROM {CHAT_TABLE}"
+
+        try:
+            cursor.execute(sql)
+            conn.commit()
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            self._console.print(f"\n📂 [bold red]Error deleting all chats: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return False
 
 
     def get_chat(self, name: str) -> list[dict[str, str]]:
@@ -205,6 +251,27 @@ class VectorDatabase:
 
         except Exception as e:
             self._console.print(f"\n📂 [bold red]Error retrieving chat [cyan]\"{name}\"[/cyan]: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return None
+
+
+    def get_all_chat_names(self) -> list[str]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        sql = f"SELECT name FROM {CHAT_TABLE}"
+
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+
+            return [row[0] for row in rows]
+
+        except Exception as e:
+            self._console.print(f"\n📂 [bold red]Error retrieving chats: {e}[/bold red]")
 
         finally:
             cursor.close()

@@ -54,9 +54,20 @@ class SessionManager:
                 "desc": "Toggles automatic chat history summarization when the context limit is hit.",
                 "argc": 0,
                 "run": self._auto_compact
+            },
+            "list": {
+                "usage": "/chat list",
+                "desc": "List all chats saved in the database.",
+                "argc": 0,
+                "run": self._list_chats
+            },
+            "delete": {
+                "usage": "/chat delete <chat name> [-a]",
+                "desc": "Deletes a saved chat from the database. Use -a to delete all chats.",
+                "argc": 1,
+                "run":self._delete_chat
             }
             #TODO: add /chat roll
-            #TODO: add /chat list
         }
 
         self._DB_COMMANDS = {
@@ -158,6 +169,36 @@ class SessionManager:
         self._console.print("\n🧹 [bold]Chat history cleared![/bold]")
 
 
+    def _list_chats(self) -> None:
+        chat_names = self._db.get_all_chat_names()
+        if chat_names is None:
+            return
+
+        self._ui.display_chat_names(chat_names)
+
+
+    def _delete_chat(self, arg: str) -> None:
+        arg = arg.strip()
+
+        if arg == "-a":
+            self._console.print("\n⚠️  [bold yellow]WARNING: This will permanently delete ALL saved chats.[/bold yellow]")
+            confirm = self._console.input("❓ [bold]Are you sure? [cyan](y/n)[/cyan]: [/bold]")
+
+            if confirm.strip().lower() == "y":
+                success = self._db.delete_all_chats()
+                if success:
+                    self._console.print("\n🗑️  [bold]All saved chats have been deleted![/bold]")
+            else:
+                self._console.print("\n🛑 [bold]Deletion canceled.[/bold]")
+
+        else:
+            success = self._db.delete_chat(arg)
+            if success:
+                self._console.print(f"\n🗑️  [bold]Chat [cyan]\"{arg}\"[/cyan] deleted successfully![/bold]")
+            else:
+                self._console.print(f"\n🔍 [bold yellow]Chat [cyan]\"{arg}\"[/cyan] not found.[/bold yellow]")
+
+
     def _set_limit(self) -> None:
         selected_limit = self._select_item_from_id_dict(CHAT_LIMITS)
         self._llm.set_chat_limit(selected_limit)
@@ -169,8 +210,13 @@ class SessionManager:
 
 
     def _clear_db(self):
-        self._db.clear()
-        self._console.print("\n🗑️  [bold]Vector database cleared![/bold]")
+        self._console.print("\n⚠️  [bold yellow]WARNING: This will permanently delete ALL papers, chunks, embeddings, and saved chats.[/bold yellow]")
+        confirm = self._console.input("❓ [bold]Are you sure? [cyan](y/n)[/cyan]: [/bold]")
+        if confirm.strip().lower() == 'y':
+            self._db.clear()
+            self._console.print("\n💥 [bold]Vector database completely cleared![/bold]")
+        else:
+            self._console.print("\n🛑 [bold]Database clear canceled.[/bold]")
 
 
     def _clear_screen(self):
@@ -182,12 +228,20 @@ class SessionManager:
         return True
 
 
+    #TODO: fix thinking prints in middle of thinking
     def _compact(self):
-        pass
+        with self._ui.wait():
+            response = self._llm.compact()
+
+        if response is not None:
+            self._ui.stream_response(response)
+            self._console.print(f"\n📦 [bold]Successfully compacted chat history![/bold]")
 
 
     def _auto_compact(self):
-        pass
+        bool_val = self._llm.toggle_auto_compact()
+        status = "on" if bool_val else "off"
+        self._console.print(f"\n⚙️  [bold]Auto-compact successfully toggled [cyan]{status}[/cyan]![/bold]")
 
 
     def _select_model(self) -> None:
@@ -196,8 +250,8 @@ class SessionManager:
         self._console.print(f"\n🤖 [bold]Using Model:[/bold] {selected_model}")
 
 
-    # def _chat_roll(self):
-    #     pass
+    def _chat_roll(self):
+        pass
 
 
     def _process_cmd(self, cmd: str) -> bool:
@@ -256,16 +310,19 @@ class SessionManager:
                 continue
 
             if user_input.startswith("/"):
+                #TODO: When clear screen don't print cursor on new line
                 done = self._process_cmd(user_input)
                 continue
 
+            #TODO: fix thinking prints in middle of thinking
             with self._ui.wait():
                 search_query = self._llm.rewrite_query(user_input)
                 embedding = self._chunker.embed_query(search_query)
                 chunks = self._db.get_formatted_chunks(embedding)
                 response = self._llm.query_chat(user_input, chunks)
 
-            self._ui.stream_response(response)
+            if response is not None:
+                self._ui.stream_response(response)
 
 
 

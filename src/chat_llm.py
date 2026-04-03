@@ -1,12 +1,16 @@
 from config import *
 import os
 from google import genai
+from rich.console import Console
 
 class ChatLLM:
     def __init__(self):
         self._chat_model = LLM_CHAT_MODEL_DEFAULT
-        self._context_size = LLM_CONTEXT_SIZE_DEFAULT
+        self._context_size = 5000
         self._rewrite_model = LLM_REWRITE_MODEL
+        self._compact_model = LLM_COMPACT_MODEL
+        self._console = Console()
+        self._auto_compact_enabled = False
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
         self._history = []
 
@@ -35,6 +39,11 @@ class ChatLLM:
         self._history = history
 
 
+    def toggle_auto_compact(self) -> bool:
+        self._auto_compact_enabled = True if not self._auto_compact_enabled else False
+        return self._auto_compact_enabled
+
+
     def get_token_count(self, history: list[dict[str, str]] | None = None) -> int:
         if history is None:
             history = self._history
@@ -48,8 +57,9 @@ class ChatLLM:
             return response.total_tokens
 
         except Exception as e:
-            pass
-            # TODO: print error
+            self._console.print(f"\n🪙 [bold red]Error calculating token count: {e}[/bold red]")
+
+        return 0
 
 
     def rewrite_query(self, query: str) -> str:
@@ -97,18 +107,42 @@ class ChatLLM:
         })
 
 
-    def query_chat(self, user_input: str, chunks: str | None) -> str:
-        new_message = {
-            "role": "user",
-            "parts": [{"text": self._construct_query(chunks, user_input)}]
-        }
+    def _auto_compact(self, new_message: dict[str, str | list]) -> None:
+        if not self._auto_compact_enabled:
+            return
 
         payload= self._history + [new_message]
         payload_len = self.get_token_count(payload)
 
         if payload_len > self._context_size:
-            pass
-            # TODO: return error message
+            self._console.print("\n🗜️  [bold yellow]Token limit reached. Triggering auto-compact.[/bold yellow]")
+
+            if self.compact():
+                self._console.print("🧼 [bold]Auto-compact successful. Context window refreshed![/bold]")
+
+
+    #TODO: fix thinking prints in middle of thinking
+    def query_chat(self, user_input: str, chunks: str | None) -> str | None:
+        new_message = {
+            "role": "user",
+            "parts": [{"text": self._construct_query(chunks, user_input)}]
+        }
+
+        self._auto_compact(new_message)
+        payload= self._history + [new_message]
+        payload_len = self.get_token_count(payload)
+
+        if payload_len > self._context_size:
+            self._console.print(
+                "\n⚠️  [bold yellow]Context Limit Exceeded:[/bold yellow] "
+                f"[bold]Message requires [cyan]{payload_len}[/cyan] tokens "
+                f"(Limit: [cyan]{self._context_size}[/cyan]).[bold]"
+            )
+            self._console.print(
+                "💡 [dim]Try running [bold cyan]/chat compact[/bold cyan], "
+                "[bold cyan]/chat auto-compact[/bold cyan], "
+                "or [bold cyan]/chat roll[/bold cyan] to free up memory![/dim]")
+            return None
 
         try:
             response = self._client.models.generate_content(
@@ -125,7 +159,47 @@ class ChatLLM:
             return response_text
 
         except Exception as e:
-            pass
-            # TODO: return error message
+            self._console.print(f"\n❌ [bold red]Generation Error: {e}[/bold red]")
+
+        return None
 
 
+    #TODO: fix thinking prints in middle of thinking
+    def compact(self) -> str | None:
+        if not self._history:
+            self._console.print("\n📭 [bold yellow]Chat history is empty. Nothing to compact.[/bold yellow]")
+            return None
+
+        transcript = ""
+        for msg in self._history:
+            role = "User" if msg["role"] == "user" else "Model"
+            content = msg["parts"][0]["text"]
+            transcript += f"{role}: {content}\n"
+
+        compact_content = (
+            "Compress the following conversation history into a self-contained "
+            f"memory summary that can replace the original chat.\n\nCHAT HISTORY:\n{transcript.strip()}"
+        )
+
+        try:
+            response = self._client.models.generate_content(
+                model=self._compact_model,
+                contents = compact_content,
+                config={
+                    "system_instruction": COMPACT_SYSTEM_PROMPT,
+                    "temperature": LLM_COMPACT_TEMP
+                }
+            )
+
+            response_text = response.text.strip()
+            self._history = [{
+                "role": "user",
+                "parts": [{"text": response_text}]
+            }]
+
+            return response_text
+
+        except Exception as e:
+            self._console.print(f"\n❌ [bold red]Compaction Error: {e}[/bold red]")
+
+        return None

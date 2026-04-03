@@ -67,6 +67,7 @@ class AxonUI:
 
 
     def wait(self):
+        #TODO: fix thinking prints in middle of thinking
         self._console.print()
         return self._console.status(
             "[bold]Thinking...[/bold]",
@@ -126,3 +127,24 @@ class AxonUI:
 
         self._console.print()
         self._console.print(table)
+
+
+    def display_chat_names(self, chat_names: list[str]) -> None:
+        if not chat_names:
+            self._console.print("\n📭 [bold yellow]No saved chats found in the database.[/bold yellow]")
+            return
+
+        list_contents = ""
+        for name in chat_names:
+            list_contents += f"  [dim]•[/dim] [cyan]\"{name}\"[/cyan]\n"
+
+        panel = Panel(
+            list_contents.rstrip(),
+            title ="📂 [bold]Saved Chats[/bold]",
+            title_align="center",
+            expand=False,
+            border_style="bold"
+        )
+
+        self._console.print("\n")
+        self._console.print(panel)
