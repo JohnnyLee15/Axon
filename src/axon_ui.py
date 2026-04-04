@@ -1,10 +1,11 @@
-from rich.console import Console
+from rich.console import Console, Group, NewLine
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich.live import Live
 from rich.markdown import Markdown
 from rich import box
+from rich.spinner import Spinner
 from config import *
 import math
 from prompt_toolkit import prompt
@@ -14,9 +15,9 @@ import time
 from select_menu import SelectMenu
 
 class AxonUI:
-    def __init__(self):
+    def __init__(self, console: Console):
         # TODO add a name to the database
-        self._console = Console()
+        self._console = console
         self._select_menu = SelectMenu()
         self._kb = KeyBindings()
         self._bind_keys()
@@ -67,17 +68,20 @@ class AxonUI:
 
 
     def wait(self):
-        #TODO: fix thinking prints in middle of thinking
-        self._console.print()
-        return self._console.status(
-            "[bold]Thinking...[/bold]",
-            spinner="dots",
-            spinner_style="bold"
+        renderable = Group(
+            NewLine(),
+            Spinner("dots", text=Text("Thinking...", style="bold"), style="bold")
+        )
+        return Live(
+            renderable,
+            console=self._console,
+            transient=True,
+            refresh_per_second=12
         )
 
 
     def stream_response(self, response: str) -> None:
-        display_text = "**[Axon] >** "
+        display_text = "<br>**[Axon] >** "
 
         with Live(
             console=self._console,

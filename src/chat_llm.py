@@ -4,13 +4,14 @@ from google import genai
 from rich.console import Console
 
 class ChatLLM:
-    def __init__(self):
+    def __init__(self, console: Console):
         self._chat_model = LLM_CHAT_MODEL_DEFAULT
-        self._context_size = 5000
+        self._context_size = LLM_CONTEXT_SIZE_DEFAULT
         self._rewrite_model = LLM_REWRITE_MODEL
         self._compact_model = LLM_COMPACT_MODEL
-        self._console = Console()
+        self._console = console
         self._auto_compact_enabled = False
+        self._chat_roll_enabled = False
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
         self._history = []
 
@@ -42,6 +43,11 @@ class ChatLLM:
     def toggle_auto_compact(self) -> bool:
         self._auto_compact_enabled = True if not self._auto_compact_enabled else False
         return self._auto_compact_enabled
+
+
+    def toggle_chat_roll(self) -> bool:
+        self._chat_roll_enabled = True if not self._chat_roll_enabled else False
+        return self._chat_roll_enabled
 
 
     def get_token_count(self, history: list[dict[str, str]] | None = None) -> int:
@@ -111,7 +117,7 @@ class ChatLLM:
         if not self._auto_compact_enabled:
             return
 
-        payload= self._history + [new_message]
+        payload = self._history + [new_message]
         payload_len = self.get_token_count(payload)
 
         if payload_len > self._context_size:
@@ -121,13 +127,21 @@ class ChatLLM:
                 self._console.print("🧼 [bold]Auto-compact successful. Context window refreshed![/bold]")
 
 
-    #TODO: fix thinking prints in middle of thinking
+    def _apply_rolling_window(self) -> None:
+        if not self._chat_roll_enabled:
+            return
+
+        if len(self._history) > MAX_ROLLING_MSGS:
+            self._history = self._history[-MAX_ROLLING_MSGS:]
+
+
     def query_chat(self, user_input: str, chunks: str | None) -> str | None:
         new_message = {
             "role": "user",
             "parts": [{"text": self._construct_query(chunks, user_input)}]
         }
 
+        self._apply_rolling_window()
         self._auto_compact(new_message)
         payload= self._history + [new_message]
         payload_len = self.get_token_count(payload)
@@ -139,8 +153,7 @@ class ChatLLM:
                 f"(Limit: [cyan]{self._context_size}[/cyan]).[bold]"
             )
             self._console.print(
-                "💡 [dim]Try running [bold cyan]/chat compact[/bold cyan], "
-                "[bold cyan]/chat auto-compact[/bold cyan], "
+                "💡 [dim]Try running [bold cyan]/chat compact[/bold cyan] "
                 "or [bold cyan]/chat roll[/bold cyan] to free up memory![/dim]")
             return None
 

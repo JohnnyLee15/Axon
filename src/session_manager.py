@@ -11,12 +11,12 @@ import sqlite3
 
 class SessionManager:
     def __init__(self):
-        self._parser = PdfParser()
-        self._chunker = SemanticChunker()
-        self._db = VectorDatabase()
-        self._ui = AxonUI()
-        self._llm = ChatLLM()
         self._console = Console()
+        self._parser = PdfParser(self._console)
+        self._chunker = SemanticChunker(self._console)
+        self._db = VectorDatabase(self._console)
+        self._ui = AxonUI(self._console)
+        self._llm = ChatLLM(self._console)
 
         self._CHAT_COMMANDS = {
             "save": {
@@ -66,8 +66,13 @@ class SessionManager:
                 "desc": "Deletes a saved chat from the database. Use -a to delete all chats.",
                 "argc": 1,
                 "run":self._delete_chat
+            },
+            "roll": {
+                "usage": "/chat roll",
+                "desc": "Toggles a rolling window that keeps the last 5 user-model chat pairs.",
+                "argc": 0,
+                "run": self._chat_roll
             }
-            #TODO: add /chat roll
         }
 
         self._DB_COMMANDS = {
@@ -228,7 +233,6 @@ class SessionManager:
         return True
 
 
-    #TODO: fix thinking prints in middle of thinking
     def _compact(self):
         with self._ui.wait():
             response = self._llm.compact()
@@ -251,7 +255,9 @@ class SessionManager:
 
 
     def _chat_roll(self):
-        pass
+        bool_val = self._llm.toggle_chat_roll()
+        status = "on" if bool_val else "off"
+        self._console.print(f"\n🔄  [bold]Chat rolling successfully toggled [cyan]{status}[/cyan]![/bold]")
 
 
     def _process_cmd(self, cmd: str) -> bool:

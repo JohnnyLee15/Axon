@@ -6,8 +6,8 @@ import json
 from rich.console import Console
 
 class VectorDatabase:
-    def __init__(self) -> None:
-        self._console = Console()
+    def __init__(self, console: Console) -> None:
+        self._console = console
         self._init_db()
 
 

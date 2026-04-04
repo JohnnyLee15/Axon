@@ -14,9 +14,10 @@ from chunk_tracker import ChunkTracker, Chunk
 from block_tracker import Block
 from typing import Callable
 from context_buffer_tracker import ContextBufferTracker
+from rich.console import Console
 
 class SemanticChunker:
-    def __init__(self):
+    def __init__(self, console: Console):
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
         # TODO: Implement CPU fallback to int4 or int8 quantization
         self._device = torch.device("mps")
@@ -33,6 +34,7 @@ class SemanticChunker:
             EMBEDDING_MODEL,
             trust_remote_code=True
         )
+        self._console = console
 
 
     def __call__(self, blocks_reg: dict[int, Block]) -> dict[int, Chunk]:

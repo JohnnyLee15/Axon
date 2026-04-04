@@ -16,15 +16,13 @@ from block_tracker import BlockTracker, Block
 from rich.console import Console
 import time
 
-console = Console()
-
 class PdfParser:
     """
     Parses PDF research papers into structured text blocks by applying
     rule-based and LLM filtering to remove academic noise.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, console: Console) -> None:
         self._model = LLM_CURATION_MODEL
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
 
@@ -39,13 +37,10 @@ class PdfParser:
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
             }
         )
+        self._console = console
 
     def __call__(self, filepath: str) -> dict[int, Block]:
-        """
-        Converts a PDF to structured blocks, filters duplicates, and removes academic noise.
-        """
-
-        console.print(
+        self._console.print(
             f"[bold]🚀 Starting PDF extraction for:[/bold] {os.path.basename(filepath)}"
         )
 
@@ -75,7 +70,7 @@ class PdfParser:
             self._extract_block(doc, item, level, tracker)
 
         blocks_reg = tracker.get_blocks_reg()
-        console.print(
+        self._console.print(
             f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
         )
 
@@ -84,7 +79,7 @@ class PdfParser:
         end_time = time.perf_counter()
         time_formatted = self._format_time(start_time, end_time)
 
-        console.print(
+        self._console.print(
             f"[bold]🎉 PDF extraction complete in {time_formatted}! "
             f"Returning {len(blocks_reg)} clean blocks.[/bold]"
         )
@@ -92,10 +87,6 @@ class PdfParser:
 
 
     def _is_potentially_noise(self, text: str) -> bool:
-        """
-        Applies rule-based checks to flag likely academic noise.
-        """
-
         text_lower = text.strip().lower()
 
         # Strip markdown formatting
@@ -114,10 +105,6 @@ class PdfParser:
         return False
 
     def _extract_item_with_text_attr(self, item: NodeItem, level: int) -> str:
-        """
-        Extracts raw text and applies Markdown formatting based on the layout label.
-        """
-
         if not item.text:
             return ""
         text = item.text.strip()
@@ -139,10 +126,6 @@ class PdfParser:
         item: NodeItem,
         level: int
     ) -> str:
-        """
-        Routes the document item to the correct extraction method based on its type.
-        """
-
         if isinstance(item, TableItem):
             return item.export_to_markdown(doc=doc).strip()
 
@@ -159,10 +142,6 @@ class PdfParser:
         level: int,
         tracker: BlockTracker
     ):
-        """
-        Processes a single item, adding a block to the Tracker if it passes validity checks.
-        """
-
         if item.label in EXCLUDED_DOCLING_LABELS:
             return None
 
@@ -184,10 +163,6 @@ class PdfParser:
 
 
     def _get_noise_blocks(self, batch_text: str) -> list[int]:
-        """
-        Calls the LLM to identify noisy blocks and returns their integer IDs.
-        """
-
         formatted_prompt = f"### INPUT DATA:\n{batch_text}"
 
         try:
@@ -202,28 +177,24 @@ class PdfParser:
                 }
             )
 
-            console.print("[bold]✅ Curation LLM responded successfully with tool arguments.[/bold]")
+            self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments.[/bold]")
             parsed_args = json.loads(response.text)
             return parsed_args.get("noise_block_ids", [])
 
         except Exception as e:
             # Return empty list to prevent pipeline crashes on API timeouts or malformed JSON
-            console.print(f"[bold]❌ Curation LLM API Error:[/bold] {e}")
+            self._console.print(f"[bold]❌ Curation LLM API Error:[/bold] {e}")
             return []
 
     def _remove_noise_blocks(self, blocks_reg: dict) -> dict:
-        """
-        Batches flagged blocks to the LLM for evaluation and filters out confirmed noise.
-        """
-
         noise_risk_bids = [b for b in blocks_reg if blocks_reg[b].is_noise_risk]
         if not noise_risk_bids:
-            console.print(
+            self._console.print(
                 "[bold]✨ No noise risks flagged by rule-based checks. Skipping LLM Curation [/bold]"
             )
             return blocks_reg
 
-        console.print(f"[bold]🤖 LLM Curation:[/bold] Evaluating {len(noise_risk_bids)} high-risk noise blocks")
+        self._console.print(f"[bold]🤖 LLM Curation:[/bold] Evaluating {len(noise_risk_bids)} high-risk noise blocks")
 
         current_batch_text = ""
         bids_to_remove = []
@@ -233,7 +204,7 @@ class PdfParser:
             entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
 
             if len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
-                console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")
+                self._console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")
                 bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
                 current_batch_text = ""
                 current_batch_count = 0
@@ -243,16 +214,13 @@ class PdfParser:
 
         # Catch the final, partially-filled batch
         if current_batch_text:
-            console.print(f"    📤 Sending final batch of {current_batch_count} blocks to LLM")
+            self._console.print(f"    📤 Sending final batch of {current_batch_count} blocks to LLM")
             bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
 
-        console.print(f"[bold]✅ Curation Finished: Removed {len(bids_to_remove)} noise blocks total[/bold]")
+        self._console.print(f"[bold]✅ Curation Finished: Removed {len(bids_to_remove)} noise blocks total[/bold]")
         return {b: blocks_reg[b] for b in blocks_reg if b not in bids_to_remove}
 
     def _format_time(self, start_time: float, end_time: float) -> str:
-        """
-        Calculates the elapsed execution time and formats.
-        """
         elapsed_time = end_time - start_time
         minutes = int(elapsed_time // 60)
         seconds = int(elapsed_time % 60)

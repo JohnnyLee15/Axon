@@ -285,6 +285,7 @@ LLM_CHAT_TEMP = 0.1
 LLM_REWRITE_TEMP = 0.1
 LLM_COMPACT_TEMP = 0.0
 REWRITE_MESSAGES = 6
+MAX_ROLLING_MSGS = 10
 LLMS = [
     {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (cheapest | quality #6)"},
     {"id": "gemini-2.5-flash", "label": "gemini-2.5-flash (low cost | quality #5)"},
