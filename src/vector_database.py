@@ -135,6 +135,34 @@ class VectorDatabase:
         return False
 
 
+    def get_lsh_candidates(self, band_hashes: list[int]) -> list[tuple[int, bytes]] | None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        band_conds = " OR ".join(
+            [f"(band_idx = {i} AND band_hash = ?)" for i in range(len(band_hashes))]
+        )
+        sql = f"""
+            SELECT DISTINCT p.id, p.minhash_sig
+            FROM {PAPER_TABLE} p
+            JOIN {LSH_TABLE} l ON p.id = l.paper_id
+            WHERE {band_conds};
+        """
+
+        try:
+            cursor.execute(sql, tuple(band_hashes))
+            return cursor.fetchall()
+
+        except Exception as e:
+            self._console.print(f"\n🔍 [bold red]Error retrieving LSH candidates: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return None
+
+
     def insert_paper(
         self,
         title: str | None,
