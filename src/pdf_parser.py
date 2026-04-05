@@ -12,7 +12,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from config import *
-from block_tracker import BlockTracker, Block
+from src.document_state import DocumentState, Block
 from rich.console import Console
 import time
 
@@ -39,7 +39,7 @@ class PdfParser:
         )
         self._console = console
 
-    def __call__(self, filepath: str) -> dict[int, Block]:
+    def __call__(self, filepath: str) -> dict[str, str | dict[int, Block]]:
         self._console.print(
             f"[bold]🚀 Starting PDF extraction for:[/bold] {os.path.basename(filepath)}"
         )
@@ -47,7 +47,7 @@ class PdfParser:
         start_time = time.perf_counter()
         doc = self._converter.convert(filepath).document
         item_iter = iter(doc.iterate_items())
-        tracker = BlockTracker()
+        tracker = DocumentState()
         processing = True
 
         while processing:
@@ -69,7 +69,9 @@ class PdfParser:
 
             self._extract_block(doc, item, level, tracker)
 
-        blocks_reg = tracker.get_blocks_reg()
+        blocks_reg, full_text, page1, title = tracker.get_doc_state()
+        title, doi = self._extract_metadata(page1, title)
+
         self._console.print(
             f"[bold]✨ Initial extraction complete:[/bold] Found {len(blocks_reg)} potential blocks"
         )
@@ -83,7 +85,54 @@ class PdfParser:
             f"[bold]🎉 PDF extraction complete in {time_formatted}! "
             f"Returning {len(blocks_reg)} clean blocks.[/bold]"
         )
-        return blocks_reg
+
+        return {
+            "blocks_reg": blocks_reg,
+            "title": title,
+            "doi": doi,
+            "full_text": full_text
+        }
+
+
+    def _extract_metadata(self, page1: str, title: str | None) -> tuple[str | None, str | None]:
+        doi = None
+
+        flat_text = page1.replace("\n", " ").strip()
+        doi_match = DOI_PATTERN.search(flat_text)
+        if doi_match:
+            doi = doi_match.group(0).strip(".,;")
+
+        if not title or not doi:
+            try:
+                self._console.print("[bold]🤖 Triggering LLM Metadata Fallback[/bold]")
+                prompt = f"<first_page_text>\n{page1}\n</first_page_text>"
+
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=prompt,
+                    config={
+                        "system_instruction": DOI_TITLE_PROMPT,
+                        "temperature": LLM_METADATA_MODEL_TEMPERATURE,
+                        "response_mime_type": "application/json",
+                        "response_schema": DOI_TITLE_SCHEMA
+                    }
+                )
+
+                self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments[/bold]")
+                parsed_args = json.loads(response.text)
+
+                if not title:
+                    llm_title = parsed_args.get("title")
+                    if llm_title:
+                        title = llm_title.lstrip("#").strip().lower()
+
+                if not doi:
+                    doi = parsed_args.get("doi")
+
+            except Exception as e:
+                self._console.print(f"[bold red]❌ LLM Metadata Fallback Error:[/bold red] {e}")
+
+        return title, doi
 
 
     def _is_potentially_noise(self, text: str) -> bool:
@@ -140,7 +189,7 @@ class PdfParser:
         doc: DoclingDocument,
         item: NodeItem,
         level: int,
-        tracker: BlockTracker
+        tracker: DocumentState
     ):
         if item.label in EXCLUDED_DOCLING_LABELS:
             return None
@@ -159,11 +208,15 @@ class PdfParser:
         if not any(char.isalnum() for char in markdown):
             return None
 
-        tracker.add_block(markdown, item.label.name, self._is_potentially_noise(markdown))
+
+        # Get page number of item from first prov only
+        page_no = item.prov[0].page_no if hasattr(item, "prov") and item.prov else None
+
+        tracker.add_block(markdown, item.label.name, page_no, self._is_potentially_noise(markdown))
 
 
     def _get_noise_blocks(self, batch_text: str) -> list[int]:
-        formatted_prompt = f"### INPUT DATA:\n{batch_text}"
+        formatted_prompt = f"<input_blocks>\n{batch_text}\n</input_blocks>"
 
         try:
             response = self._client.models.generate_content(
@@ -177,13 +230,13 @@ class PdfParser:
                 }
             )
 
-            self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments.[/bold]")
+            self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments[/bold]")
             parsed_args = json.loads(response.text)
             return parsed_args.get("noise_block_ids", [])
 
         except Exception as e:
             # Return empty list to prevent pipeline crashes on API timeouts or malformed JSON
-            self._console.print(f"[bold]❌ Curation LLM API Error:[/bold] {e}")
+            self._console.print(f"[bold red]❌ Curation LLM API Error: {e}[/bold red]")
             return []
 
     def _remove_noise_blocks(self, blocks_reg: dict) -> dict:
@@ -201,7 +254,7 @@ class PdfParser:
         current_batch_count = 0
         for bid in noise_risk_bids:
             block_text = blocks_reg[bid].markdown
-            entry = f"\n=============\n[BID: {bid}]\n{block_text}\n"
+            entry = f"<block id='{bid}'>\n{block_text}\n</block>\n"
 
             if len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
                 self._console.print(f"    📤 Sending batch of {current_batch_count} blocks to LLM")

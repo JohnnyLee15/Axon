@@ -79,7 +79,11 @@ class ChatLLM:
             content = msg["parts"][0]["text"]
             transcript += f"{role}: {content}\n"
 
-        user_content = f"History:\n{transcript.strip()}\n\nNew Question:\n{query}"
+        user_content = (
+            f"<chat_history>\n{transcript.strip()}\n</chat_history>\n"
+            f"<user_question>\n{query}\n</user_question>"
+        )
+
         try:
             response = self._client.models.generate_content(
                 model=self._rewrite_model,
@@ -99,7 +103,10 @@ class ChatLLM:
         if not chunks:
             return user_input
 
-        return f"Retrieved Excerpts:\n{chunks}\n\nUser Question:\n{user_input}".strip()
+        return (
+            f"<retrieved_excerpts>\n{chunks}\n</retrieved_excerpts>\n"
+            f"<user_question>\n{user_input}\n</user_question>".strip()
+        )
 
 
     def _add_history(self, user_input: str, response: str) -> None:
@@ -191,7 +198,8 @@ class ChatLLM:
 
         compact_content = (
             "Compress the following conversation history into a self-contained "
-            f"memory summary that can replace the original chat.\n\nCHAT HISTORY:\n{transcript.strip()}"
+            f"memory summary that can replace the original chat.\n"
+            f"<chat_history>\n{transcript.strip()}\n</chat_history>"
         )
 
         try:

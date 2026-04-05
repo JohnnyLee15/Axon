@@ -6,17 +6,19 @@ import re
 from pathlib import Path
 
 # ------ Block Processing Constants ------
+DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+")
 
 # Blocks under this count trigger an LLM review
 MIN_WORD_COUNT_THRESHOLD = 15
-
 MIN_CHAR_COUNT = 15
 
 # Maximum characters per Groq API request
 LLM_CURATION_BATCH_CHAR_LIMIT = 4000
 
 LLM_CURATION_MODEL = "gemini-2.5-flash-lite"
+LLM_METADATA_MODEL = "gemini-2.5-flash-lite"
 LLM_CURATION_MODEL_TEMPERATURE = 0.0
+LLM_METADATA_MODEL_TEMPERATURE = 0.0
 GEM_API_KEY = "GEM_API_KEY"
 
 HYPHEN_WRAP_PATTERN = re.compile(r'([A-Za-z]+)-\s*\n\s*([a-z]+)')
@@ -36,8 +38,16 @@ CHUNK_TABLE = "chunks"
 VEC_TABLE = "vec"
 PAPER_TABLE = "papers"
 CHAT_TABLE = "chats"
+LSH_TABLE = "lsh"
 CHUNKS_MATCHED = 5
 MAX_COS_DIST = 0.45
+
+# ------ MinHasher Constants ------
+LSH_BANDS = 16
+LSH_ROWS = 16
+NUM_MIN_HASH_FUNCS = LSH_BANDS * LSH_ROWS
+MIN_HASH_SEED = 16
+NUM_WORDS_PER_ITEM = 3
 
 # ------ Semantic Chunker Constants ------
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
@@ -126,7 +136,7 @@ NOISE_REGEX_PATTERNS = [
 LLM_CURATION_PROMPT = """You are a Data Curation Expert for a Scientific RAG (Retrieval-Augmented Generation) pipeline.
 Your task is to classify text blocks extracted from PDF research papers as either "Signal" (Keep) or "Noise" (Remove).
 
-The input contains text blocks marked with integer IDs (e.g., [BID: 12]).
+The input contains text blocks wrapped in <block id="x"> tags, all enclosed within an <input_blocks> parent tag.
 Analyze the provided blocks and identify the IDs of the blocks that should be REMOVED (marked as noise).
 
 ### CRITERIA FOR CLASSIFICATION
@@ -145,9 +155,12 @@ Analyze the provided blocks and identify the IDs of the blocks that should be RE
 5. **References/Bibliography:** The list of citations at the end of the paper. (Note: Keep the "References" header itself if you want to know where it starts, but remove the list items).
 
 ### INPUT FORMAT
-Each block is separated by "=============".
-[BID: <integer>]
+<input_blocks>
+<block id='<integer>'>
 <text content>
+</block>
+...
+</input_blocks>
 
 **ACTION REQUIRED:** Return a JSON object containing the array of BIDs you have identified as Noise under the key `noise_block_ids`. Do not include Signal IDs.
 """
@@ -162,6 +175,34 @@ CURATION_TOOL = {
         }
     },
     "required": ["noise_block_ids"]
+}
+
+DOI_TITLE_PROMPT = """Extract the article title and DOI from the raw text of the FIRST PAGE of a scientific PDF.
+The raw text will be provided inside <first_page_text> XML tags.
+
+Extraction rules:
+1. Extract the main article title only.
+2. Do NOT return the journal name, running header, author names, affiliations, correspondence text, abstract heading, footer text, or section headings.
+3. Reconstruct multi-line titles into one clean string.
+4. Extract the DOI only if explicitly present. Normalize it to bare DOI form (e.g., 10.1016/j.jcv.2024.105123). Do not include prefixes like "doi:" or "https://doi.org/".
+5. If a field cannot be confidently identified, leave it null. Do not guess.
+"""
+
+DOI_TITLE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "title": {
+            "type": "STRING",
+            "description": "Main article title",
+            "nullable": True
+        },
+        "doi": {
+            "type": "STRING",
+            "description": "Bare normalized DOI (e.g., 10.1000/xyz123)",
+            "nullable": True
+        }
+    },
+    "required": ["title", "doi"]
 }
 
 AXON_SYSTEM_PROMPT = """Your name is Axon. You are a versatile AI assistant with strong scientific and technical knowledge.
@@ -180,7 +221,7 @@ How to use retrieved context:
 - If the excerpts are irrelevant or insufficient, ignore them and answer from your own knowledge.
 - Never tell the user you cannot answer just because the retrieved excerpts do not contain the answer.
 - Never focus your reply on the existence or absence of retrieved excerpts unless the user explicitly asks about the source material.
-- Always answer the # User Question directly.
+- Always answer the <user_question> directly.
 
 Behavior rules:
 - Always identify as Axon if asked your name.
@@ -192,12 +233,12 @@ Behavior rules:
 
 REWRITE_SYSTEM_PROMPT = """You rewrite conversational questions into standalone search queries for retrieval.
 
-Your task is to take the user's latest question and recent chat history, and output one clear standalone search query.
+Your task is to take the <user_question> and the <chat_history>, and output one clear standalone search query.
 
 RULES:
-1. If the latest question is already clear and standalone, return it unchanged.
-2. Use chat history only when needed to resolve references like 'it', 'they', 'this', 'that assay', 'the Abbott one', or similar vague follow-ups.
-3. If the latest question starts a new topic or does not depend on the chat history, do not force a connection. Output the user's question unchanged.
+1. If the <user_question> is already clear and standalone, return it unchanged.
+2. Use the <chat_history> only when needed to resolve references like 'it', 'they', 'this', 'that assay', 'the Abbott one', or similar vague follow-ups.
+3. If the <user_question> starts a new topic or does not depend on the history, do not force a connection. Output the <user_question> unchanged.
 4. Preserve the user's original meaning, scope, and specificity.
 5. Do not answer the question.
 6. Do not explain your reasoning.

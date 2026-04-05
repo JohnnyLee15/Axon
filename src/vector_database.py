@@ -29,31 +29,48 @@ class VectorDatabase:
                 paper_id INTEGER NOT NULL CHECK (paper_id > 0) REFERENCES {PAPER_TABLE}(id) ON DELETE CASCADE,
                 chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
                 markdown TEXT NOT NULL
-            )
+            );
         """
         create_vec_table = f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS {VEC_TABLE} USING vec0 (
                 id INTEGER PRIMARY KEY,
                 embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine
-            )
+            );
         """
         create_paper_table = f"""
             CREATE TABLE IF NOT EXISTS {PAPER_TABLE} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT
-            )
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                doi TEXT UNIQUE,
+                minhash_sig BLOB NOT NULL
+            );
+        """
+        create_lsh_table = f"""
+            CREATE TABLE IF NOT EXISTS {LSH_TABLE} (
+                paper_id INTEGER NOT NULL REFERENCES {PAPER_TABLE}(id) ON DELETE CASCADE,
+                band_idx INTEGER NOT NULL CHECK (band_idx >= 0 and band_idx < {LSH_BANDS}),
+                band_hash INTEGER NOT NULL,
+                PRIMARY KEY (paper_id, band_idx)
+            ) WITHOUT ROWID;
+        """
+        create_lsh_lookup_index = f"""
+            CREATE INDEX IF NOT EXISTS idx_{LSH_TABLE}_lookup
+            ON {LSH_TABLE} (band_idx, band_hash)
         """
         create_chats_table = f"""
             CREATE TABLE IF NOT EXISTS {CHAT_TABLE} (
                 name TEXT PRIMARY KEY,
                 chat_content TEXT
-            )
+            );
         """
 
         try:
             cursor.execute(create_paper_table)
             cursor.execute(create_chunks_table)
             cursor.execute(create_vec_table)
+            cursor.execute(create_lsh_table)
             cursor.execute(create_chats_table)
+            cursor.execute(create_lsh_lookup_index)
             conn.commit()
 
         except sqlite3.Error as e:
@@ -68,14 +85,16 @@ class VectorDatabase:
     def clear(self) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
-        clear_vec = f"DELETE FROM {VEC_TABLE}"
-        clear_chunks = f"DELETE FROM {CHUNK_TABLE}"
-        clear_papers = f"DELETE FROM {PAPER_TABLE}"
-        clear_chats = f"DELETE FROM {CHAT_TABLE}"
+        clear_vec = f"DELETE FROM {VEC_TABLE};"
+        clear_chunks = f"DELETE FROM {CHUNK_TABLE};"
+        clear_lsh = f"DELETE FROM {LSH_TABLE}"
+        clear_papers = f"DELETE FROM {PAPER_TABLE};"
+        clear_chats = f"DELETE FROM {CHAT_TABLE};"
 
         try:
             cursor.execute(clear_vec)
             cursor.execute(clear_chunks)
+            cursor.execute(clear_lsh)
             cursor.execute(clear_papers)
             cursor.execute(clear_chats)
             conn.commit()
@@ -91,25 +110,77 @@ class VectorDatabase:
             conn.close()
 
 
-    def create_paper(self) -> int:
+    def doi_exists(self, doi: str) -> bool:
         conn = self._get_connection()
         cursor = conn.cursor()
-        sql = f"INSERT INTO {PAPER_TABLE} DEFAULT VALUES"
+        sql = f"""
+            SELECT 1
+            FROM {PAPER_TABLE}
+            WHERE doi = ?
+            LIMIT 1;
+        """
 
         try:
-            cursor.execute(sql)
+            cursor.execute(sql, (doi,))
+            row = cursor.fetchone()
+            return row is not None
+
+        except Exception as e:
+            self._console.print(f"\n🆔 [bold red]Error checking DOI existence [cyan]({doi})[/cyan]: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return False
+
+
+    def insert_paper(
+        self,
+        title: str | None,
+        doi: str | None,
+        minhash_sig: bytes,
+        band_hashes: list[int]
+    ) -> int:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        paper_stmt = f"""
+            INSERT INTO {PAPER_TABLE} (
+                title,
+                doi,
+                minhash_sig
+            )
+            VALUES (?, ?, ?);
+        """
+        lsh_stmt = f"""
+            INSERT INTO {LSH_TABLE} (
+                paper_id,
+                band_idx,
+                band_hash
+            )
+            VALUES (?, ?, ?);
+        """
+
+        try:
+            cursor.execute(paper_stmt, (title, doi, minhash_sig))
             paper_id = cursor.lastrowid
+
+            lsh_params = [(paper_id, i, h) for i, h in enumerate(band_hashes)]
+            cursor.executemany(lsh_stmt, lsh_params)
+
             conn.commit()
             return paper_id
 
         except sqlite3.Error as e:
             conn.rollback()
             self._console.print(f"\n📄 [bold red]Error creating new paper: {e}[/bold red]")
-            return -1
 
         finally:
             cursor.close()
             conn.close()
+
+        return -1
+
 
     def insert_paper_chunks(self, chunks: dict[int, Chunk], paper_id: int) -> None:
         conn = self._get_connection()
@@ -120,14 +191,14 @@ class VectorDatabase:
                 chunk_index,
                 markdown
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?);
         """
         insert_vec = f"""
             INSERT INTO {VEC_TABLE} (
                 id,
                 embedding
             )
-            VALUES (?, ?)
+            VALUES (?, ?);
         """
         try:
             for chunk_index in chunks:
@@ -174,7 +245,7 @@ class VectorDatabase:
                 name,
                 chat_content
             )
-            VALUES (?, ?)
+            VALUES (?, ?);
         """
         try:
             cursor.execute(sql, (name, json.dumps(contents)))
@@ -195,7 +266,7 @@ class VectorDatabase:
     def delete_chat(self, chat: str) -> bool:
         conn = self._get_connection()
         cursor = conn.cursor()
-        sql = f"DELETE FROM {CHAT_TABLE} WHERE name = ?"
+        sql = f"DELETE FROM {CHAT_TABLE} WHERE name = ?;"
 
         try:
             cursor.execute(sql, (chat,))
@@ -240,7 +311,7 @@ class VectorDatabase:
     def get_chat(self, name: str) -> list[dict[str, str]]:
         conn = self._get_connection()
         cursor = conn.cursor()
-        sql = f"SELECT chat_content FROM {CHAT_TABLE} WHERE name = ?"
+        sql = f"SELECT chat_content FROM {CHAT_TABLE} WHERE name = ?;"
 
         try:
             cursor.execute(sql,(name, ))
@@ -262,7 +333,7 @@ class VectorDatabase:
     def get_all_chat_names(self) -> list[str]:
         conn = self._get_connection()
         cursor = conn.cursor()
-        sql = f"SELECT name FROM {CHAT_TABLE}"
+        sql = f"SELECT name FROM {CHAT_TABLE};"
 
         try:
             cursor.execute(sql)
@@ -296,7 +367,7 @@ class VectorDatabase:
             WHERE v.embedding MATCH ?
                 AND k = {CHUNKS_MATCHED}
                 AND v.distance <= {MAX_COS_DIST}
-            ORDER BY c.paper_id, c.chunk_index
+            ORDER BY c.paper_id, c.chunk_index;
         """
 
         try:

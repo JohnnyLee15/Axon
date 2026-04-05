@@ -11,7 +11,7 @@ import torch
 import pysbd
 from transformers import AutoModel, AutoTokenizer
 from chunk_tracker import ChunkTracker, Chunk
-from block_tracker import Block
+from src.document_state import Block
 from typing import Callable
 from context_buffer_tracker import ContextBufferTracker
 from rich.console import Console

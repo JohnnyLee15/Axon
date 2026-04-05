@@ -3,6 +3,7 @@ from pdf_parser import PdfParser
 from vector_database import VectorDatabase
 from axon_ui import AxonUI
 from chat_llm import ChatLLM
+from min_hasher import MinHasher
 from config import *
 from rich.console import Console
 from typing import Any
@@ -17,6 +18,7 @@ class SessionManager:
         self._db = VectorDatabase(self._console)
         self._ui = AxonUI(self._console)
         self._llm = ChatLLM(self._console)
+        self._minhasher = MinHasher(self._console)
 
         self._CHAT_COMMANDS = {
             "save": {
@@ -210,7 +212,7 @@ class SessionManager:
         self._console.print(f"\n📏 [bold]Chat Context Limit:[/bold] {selected_limit}")
 
 
-    def _load_pdfs(self):
+    def _load_pdfs(self, filepath: str):
         pass
 
 

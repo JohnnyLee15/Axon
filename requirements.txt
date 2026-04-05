@@ -7,3 +7,5 @@ pysbd
 sqlite-vec
 google.genai
 prompt_toolkit
+datasketch
+xxhash
