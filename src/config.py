@@ -47,9 +47,9 @@ LSH_BANDS = 16
 LSH_ROWS = 16
 NUM_MIN_HASH_FUNCS = LSH_BANDS * LSH_ROWS
 MIN_HASH_SEED = 16
-NUM_WORDS_PER_ITEM = 3
-JACCARD_CUTOFF = 0.885
-NORMALIZE_DOC_PATTERN = re.compile(r"[^a-z0-9\s]")
+NUM_CHARS_PER_SHINGLE = 5
+JACCARD_CUTOFF = 0.84
+NORMALIZE_DOC_PATTERN = re.compile(r"[^a-z0-9]")
 
 # ------ Semantic Chunker Constants ------
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"

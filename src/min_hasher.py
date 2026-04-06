@@ -14,16 +14,14 @@ class MinHasher:
 
 
     def minhash_doc(self, doc: str) -> tuple[bytes | None, list[int] | None]:
-        doc = NORMALIZE_DOC_PATTERN.sub(" ", doc.lower())
-        words = doc.split()
-        if len(words) < NUM_WORDS_PER_ITEM:
+        doc = NORMALIZE_DOC_PATTERN.sub("", doc.lower())
+        if len(doc) < NUM_CHARS_PER_SHINGLE:
             return None, None
 
-        minhash = MinHash(num_perm=(LSH_BANDS * LSH_ROWS), seed=MIN_HASH_SEED)
-        for i in range(len(words) - NUM_WORDS_PER_ITEM + 1):
-            shingle = words[i:(i + NUM_WORDS_PER_ITEM)]
-            shingle_bytes = " ".join(shingle).encode("utf-8")
-            minhash.update(shingle_bytes)
+        minhash = MinHash(num_perm=NUM_MIN_HASH_FUNCS, seed=MIN_HASH_SEED)
+        for i in range(len(doc) - NUM_CHARS_PER_SHINGLE + 1):
+            shingle = doc[i:(i + NUM_CHARS_PER_SHINGLE)]
+            minhash.update(shingle.encode("utf-8"))
 
         # dtype is uint64
         minhash_sig = minhash.digest()
