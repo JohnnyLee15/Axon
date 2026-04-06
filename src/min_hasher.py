@@ -14,6 +14,7 @@ class MinHasher:
 
 
     def minhash_doc(self, doc: str) -> tuple[bytes | None, list[int] | None]:
+        doc = NORMALIZE_DOC_PATTERN.sub(" ", doc.lower())
         words = doc.split()
         if len(words) < NUM_WORDS_PER_ITEM:
             return None, None

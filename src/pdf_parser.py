@@ -12,7 +12,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from config import *
-from src.document_state import DocumentState, Block
+from document_state import DocumentState, Block
 from rich.console import Console
 import time
 
