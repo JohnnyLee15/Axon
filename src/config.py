@@ -7,6 +7,20 @@ from pathlib import Path
 
 # ------ Block Processing Constants ------
 DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+")
+PMCID_PATTERN = re.compile(r"\b(PMC\d+)\b", re.IGNORECASE)
+PMCID_FILENAME_PATTERN = re.compile(r"^(PMC\d+)$", re.IGNORECASE)
+PMID_PATTERN = re.compile(r"\bpmid\s*:?\s*(\d+)\b", re.IGNORECASE)
+ARXIV_PATTERN = re.compile(
+    r"\barxiv:\s*("
+    r"(?:\d{4}\.\d{4,5}|[A-Za-z\-]+(?:\.[A-Za-z\-]+)?/\d{7})"
+    r"(?:v\d+)?"
+    r")\b",
+    re.IGNORECASE,
+)
+ARXIV_FILENAME_PATTERN = re.compile(
+    r"^(\d{4}\.\d{4,5}(?:v\d+)?)$",
+    re.IGNORECASE,
+)
 
 # Blocks under this count trigger an LLM review
 MIN_WORD_COUNT_THRESHOLD = 15
@@ -179,32 +193,30 @@ CURATION_TOOL = {
     "required": ["noise_block_ids"]
 }
 
-DOI_TITLE_PROMPT = """Extract the article title and DOI from the raw text of the FIRST PAGE of a scientific PDF.
+TITLE_PROMPT = """Extract the main article title from the raw text of the FIRST PAGE of a scientific PDF.
 The raw text will be provided inside <first_page_text> XML tags.
+
+Return only the article title if it can be identified from the first page.
 
 Extraction rules:
 1. Extract the main article title only.
-2. Do NOT return the journal name, running header, author names, affiliations, correspondence text, abstract heading, footer text, or section headings.
-3. Reconstruct multi-line titles into one clean string.
-4. Extract the DOI only if explicitly present. Normalize it to bare DOI form (e.g., 10.1016/j.jcv.2024.105123). Do not include prefixes like "doi:" or "https://doi.org/".
-5. If a field cannot be confidently identified, leave it null. Do not guess.
+2. Do NOT return the journal name, running header, author names, affiliations, correspondence text, abstract heading, footer text, page numbers, dates, or section headings.
+3. Reconstruct a multi-line title into one clean string with single spaces.
+4. If the title cannot be confidently identified, return null.
+5. Do not guess, infer, or fabricate anything.
+6. Never return anything except the title field in the JSON response.
 """
 
-DOI_TITLE_SCHEMA = {
-    "type": "OBJECT",
+TITLE_SCHEMA = {
+    "type": "object",
     "properties": {
         "title": {
-            "type": "STRING",
-            "description": "Main article title",
-            "nullable": True
-        },
-        "doi": {
-            "type": "STRING",
-            "description": "Bare normalized DOI (e.g., 10.1000/xyz123)",
+            "type": "string",
+            "description": "Main article title, cleaned and reconstructed into one line",
             "nullable": True
         }
     },
-    "required": ["title", "doi"]
+    "required": ["title"]
 }
 
 AXON_SYSTEM_PROMPT = """Your name is Axon. You are a versatile AI assistant with strong scientific and technical knowledge.

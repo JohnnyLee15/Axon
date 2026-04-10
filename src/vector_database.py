@@ -2,6 +2,7 @@ import sqlite3
 import sqlite_vec
 from config import *
 from chunk_tracker import Chunk
+from document_state import ParsedDoc
 import json
 from rich.console import Console
 
@@ -42,6 +43,9 @@ class VectorDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT,
                 doi TEXT UNIQUE,
+                arxiv TEXT UNIQUE,
+                pmcid TEXT UNIQUE,
+                pmid TEXT UNIQUE,
                 minhash_sig BLOB NOT NULL
             );
         """
@@ -82,25 +86,25 @@ class VectorDatabase:
             conn.close()
 
 
-    def clear(self) -> None:
+    def _drop_all(self) -> bool:
         conn = self._get_connection()
         cursor = conn.cursor()
-        clear_vec = f"DELETE FROM {VEC_TABLE};"
-        clear_chunks = f"DELETE FROM {CHUNK_TABLE};"
-        clear_lsh = f"DELETE FROM {LSH_TABLE}"
-        clear_papers = f"DELETE FROM {PAPER_TABLE};"
-        clear_chats = f"DELETE FROM {CHAT_TABLE};"
+        drop_vec = f"DROP TABLE IF EXISTS {VEC_TABLE};"
+        drop_chunks = f"DROP TABLE IF EXISTS {CHUNK_TABLE};"
+        drop_lsh = f"DROP TABLE IF EXISTS {LSH_TABLE};"
+        drop_papers = f"DROP TABLE IF EXISTS {PAPER_TABLE};"
+        drop_chats = f"DROP TABLE IF EXISTS {CHAT_TABLE};"
 
         try:
-            cursor.execute(clear_vec)
-            cursor.execute(clear_chunks)
-            cursor.execute(clear_lsh)
-            cursor.execute(clear_papers)
-            cursor.execute(clear_chats)
+            cursor.execute(drop_vec)
+            cursor.execute(drop_chunks)
+            cursor.execute(drop_lsh)
+            cursor.execute(drop_papers)
+            cursor.execute(drop_chats)
             conn.commit()
 
             cursor.execute("VACUUM")
-
+            return True
         except sqlite3.Error as e:
             conn.rollback()
             self._console.print(f"\n🧹 [bold red]Error dropping tables during database clear: {e}[/bold red]")
@@ -109,30 +113,55 @@ class VectorDatabase:
             cursor.close()
             conn.close()
 
+        return False
 
-    def doi_exists(self, doi: str) -> bool:
+
+    def reset(self) -> None:
+        if self._drop_all():
+            self._init_db()
+
+
+    def metadata_exists(self, parsed_doc: ParsedDoc) -> bool | None:
         conn = self._get_connection()
         cursor = conn.cursor()
         sql = f"""
             SELECT 1
             FROM {PAPER_TABLE}
             WHERE doi = ?
+                OR arxiv = ?
+                OR pmcid = ?
+                OR pmid = ?
             LIMIT 1;
         """
 
+        params = (parsed_doc.doi, parsed_doc.arxiv, parsed_doc.pmcid, parsed_doc.pmid)
         try:
-            cursor.execute(sql, (doi,))
+            cursor.execute(sql, params)
             row = cursor.fetchone()
             return row is not None
 
         except Exception as e:
-            self._console.print(f"\n🆔 [bold red]Error checking DOI existence [cyan]({doi})[/cyan]: {e}[/bold red]")
+            active_ids = []
+            if parsed_doc.doi:
+                active_ids.append(f"DOI: {parsed_doc.doi}")
+
+            if parsed_doc.arxiv:
+                active_ids.append(f"arXiv: {parsed_doc.arxiv}")
+
+            if parsed_doc.pmcid:
+                active_ids.append(f"PMCID: {parsed_doc.pmcid}")
+
+            if parsed_doc.pmid:
+                active_ids.append(f"PMID: {parsed_doc.pmid}")
+
+            id_str = ", ".join(active_ids) if active_ids else "No Identifiers"
+            self._console.print(f"\n❌ [bold red]Database Error checking metadata [cyan]({id_str})[/cyan]:[/bold red] {e}")
 
         finally:
             cursor.close()
             conn.close()
 
-        return False
+        return None
 
 
     def get_lsh_candidates(self, band_hashes: list[int]) -> list[tuple[int, bytes]] | None:
@@ -165,8 +194,7 @@ class VectorDatabase:
 
     def insert_paper(
         self,
-        title: str | None,
-        doi: str | None,
+        parsed_doc: ParsedDoc,
         minhash_sig: bytes,
         band_hashes: list[int]
     ) -> int:
@@ -176,9 +204,12 @@ class VectorDatabase:
             INSERT INTO {PAPER_TABLE} (
                 title,
                 doi,
+                arxiv,
+                pmcid,
+                pmid,
                 minhash_sig
             )
-            VALUES (?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?);
         """
         lsh_stmt = f"""
             INSERT INTO {LSH_TABLE} (
@@ -189,8 +220,17 @@ class VectorDatabase:
             VALUES (?, ?, ?);
         """
 
+        paper_params = (
+            parsed_doc.title,
+            parsed_doc.doi,
+            parsed_doc.arxiv,
+            parsed_doc.pmcid,
+            parsed_doc.pmid,
+            minhash_sig
+        )
+
         try:
-            cursor.execute(paper_stmt, (title, doi, minhash_sig))
+            cursor.execute(paper_stmt, paper_params)
             paper_id = cursor.lastrowid
 
             lsh_params = [(paper_id, i, h) for i, h in enumerate(band_hashes)]

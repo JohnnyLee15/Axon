@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from typing import TypeAlias
 
 Block: TypeAlias = SimpleNamespace
+ParsedDoc: TypeAlias = SimpleNamespace
 
 class DocumentState:
     def __init__(self) -> None:
@@ -9,20 +10,11 @@ class DocumentState:
         self._curr_bid = 0
         self._seen_content = set()
         self._full_raw_text = ""
-        self._page1 = ""
+        self._page_one = ""
         self._title = None
 
-    def add_block(self, markdown: str, label: str, page_no: int, is_noise_risk: bool) -> None:
-        spacer_full = "" if not self._full_raw_text else "\n\n"
-        self._full_raw_text += (spacer_full + markdown)
 
-        if page_no == 1:
-            spacer_first = "" if not self._page1 else "\n\n"
-            self._page1 += (spacer_first + markdown)
-
-            if label == "TITLE" and self._title is None:
-                self._title = markdown.lstrip("#").strip().lower()
-
+    def add_block(self, markdown: str, label: str, is_noise_risk: bool) -> None:
         content_hash = hash(markdown)
         if content_hash in self._seen_content:
             return
@@ -35,5 +27,30 @@ class DocumentState:
         )
         self._curr_bid += 1
 
-    def get_doc_state(self) -> tuple[dict[int, Block], str, str, str | None]:
-        return self._blocks_reg, self._full_raw_text, self._page1, self._title
+
+    def set_title_if_missing(self, text: str) -> None:
+        if not self._title:
+            self._title = text
+
+
+    def add_to_full_raw_text(self, text: str) -> None:
+        spacer_full = "" if not self._full_raw_text else "\n\n"
+        self._full_raw_text += (spacer_full + text)
+
+
+    def add_to_first_page(self, text: str) -> None:
+        spacer_first = "" if not self._page_one else "\n\n"
+        self._page_one += (spacer_first + text)
+
+
+    def get_doc_state(self) -> ParsedDoc:
+        return ParsedDoc(
+            blocks_reg = self._blocks_reg,
+            full_raw_text = self._full_raw_text,
+            page_one = self._page_one,
+            title = self._title,
+            doi = None,
+            pmcid = None,
+            pmid = None,
+            arxiv = None
+        )
