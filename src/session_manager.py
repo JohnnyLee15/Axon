@@ -4,6 +4,7 @@ from vector_database import VectorDatabase
 from axon_ui import AxonUI
 from chat_llm import ChatLLM
 from min_hasher import MinHasher
+from document_state import ParsedDoc
 from config import *
 from rich.console import Console
 from typing import Any
@@ -251,12 +252,29 @@ class SessionManager:
             jaccard_estimate = self._minhasher.estimate_jaccard(sig_bytes, cand_sig_bytes)
             if jaccard_estimate >= JACCARD_CUTOFF:
                 self._console.print(
-                    f"🛑 [bold yellow]Duplicate content detected [cyan](ID: {cand_pid})[/cyan], "
-                    f"Similarity: {jaccard_estimate:.3f}). Skipping.[/bold yellow]"
+                    f"🛑 [bold yellow]Duplicate content detected ([cyan]ID: {cand_pid}[/cyan], "
+                    f"[cyan]Similarity: [cyan]{jaccard_estimate:.3f}[/cyan]). Skipping.[/bold yellow]"
                 )
                 return True
 
         return False
+
+
+    def _get_active_ids(self, parsed_doc: ParsedDoc) -> list[str]:
+        active_ids = []
+        if parsed_doc.doi:
+            active_ids.append(f"DOI: {parsed_doc.doi}")
+
+        if parsed_doc.arxiv:
+            active_ids.append(f"arXiv: {parsed_doc.arxiv}")
+
+        if parsed_doc.pmcid:
+            active_ids.append(f"PMCID: {parsed_doc.pmcid}")
+
+        if parsed_doc.pmid:
+            active_ids.append(f"PMID: {parsed_doc.pmid}")
+
+        return  ", ".join(active_ids) if active_ids else "Unknown"
 
 
     def _process_pdf(self, pdf_path: Path) -> int | None:
@@ -272,21 +290,7 @@ class SessionManager:
                 return
 
             if exists:
-                active_ids = []
-                if parsed_doc.doi:
-                    active_ids.append(f"DOI: {parsed_doc.doi}")
-
-                if parsed_doc.arxiv:
-                    active_ids.append(f"arXiv: {parsed_doc.arxiv}")
-
-                if parsed_doc.pmcid:
-                    active_ids.append(f"PMCID: {parsed_doc.pmcid}")
-
-                if parsed_doc.pmid:
-                    active_ids.append(f"PMID: {parsed_doc.pmid}")
-
-                id_str = ", ".join(active_ids) if active_ids else "Unknown"
-
+                id_str = self._get_active_ids(parsed_doc)
                 self._console.print(f"🛑 [bold yellow]Duplicate metadata detected [cyan]({id_str})[/cyan]. Skipping.[/bold yellow]")
                 return
 
@@ -324,7 +328,7 @@ class SessionManager:
         if not pdf_files:
             return
 
-        self._console.print(f"\n🚀 [bold]Starting Axon Ingestion Pipeline [cyan]({len(pdf_files)} files)[/cyan][/bold]")
+        self._console.print(f"\n🚀 [bold]Starting Axon Ingestion Pipeline [cyan]({len(pdf_files)} PDF files)[/cyan][/bold]")
         for pdf_path in pdf_files:
             self._console.print()
             self._console.rule(f"[bold cyan]{pdf_path.name}[/bold cyan]", style="bold")
@@ -336,7 +340,7 @@ class SessionManager:
 
             end_time = time.perf_counter()
             time_str = self._format_time(start_time, end_time)
-            self._console.print(f"✅ [bold]Paper ingested successfully [cyan](ID: {pid})[/cyan] in {time_str}.[/bold]")
+            self._console.print(f"✅ [bold]Paper ingested successfully ([cyan]ID: {pid}[/cyan]) in {time_str}.[/bold]")
 
 
     def _clear_db(self):

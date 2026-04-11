@@ -71,7 +71,7 @@ class PdfParser:
         return parsed_doc
 
 
-    def _extract_metadata(self, parsed_doc: ParsedDoc, filepath: Path) -> None:
+    def _extract_pdf_ids(self, parsed_doc: ParsedDoc, filepath: Path) -> None:
         flat_text = parsed_doc.page_one.replace("\n", " ").strip()
 
         doi_match = DOI_PATTERN.search(flat_text)
@@ -98,11 +98,8 @@ class PdfParser:
         if pmid_match:
             parsed_doc.pmid = pmid_match.group(1)
 
-        # TODO: REMOVE
-        self._console.print(
-            f"[dim]🔍 Regex Found - Title extracted natively: {bool(parsed_doc.title)} | "
-            f"DOI: {parsed_doc.doi} | PMCID: {parsed_doc.pmcid} | arXiv: {parsed_doc.arxiv} | PMID: {parsed_doc.pmid}[/dim]"
-        )
+    def _extract_metadata(self, parsed_doc: ParsedDoc, filepath: Path) -> None:
+        self._extract_pdf_ids(parsed_doc, filepath)
 
         if not parsed_doc.title:
             try:

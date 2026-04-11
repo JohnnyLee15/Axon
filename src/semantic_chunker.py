@@ -209,6 +209,8 @@ class SemanticChunker:
         context_buffers: list[str],
         char_map_list: list[dict[int, tuple[int, int]]]
     ) -> None:
+        cids = []
+        embeddings = []
         for i, context_buffer in enumerate(context_buffers):
             char_map = char_map_list[i]
             tokens = self._tokenizer(
@@ -223,8 +225,18 @@ class SemanticChunker:
             # Grab [0] because HF expects batched inputs, so batched outputs
             offsets = tokens["offset_mapping"][0].tolist()
 
-            with torch.no_grad():
-                output = self._model(input_ids=token_ids, attention_mask=padding_mask)
+            adapter_mask = torch.full(
+                (token_ids.shape[0],),
+                self._model._adaptation_map["retrieval.passage"],
+                dtype=torch.int32
+            ).to(self._device)
+
+            with torch.inference_mode():
+                output = self._model(
+                    input_ids=token_ids,
+                    attention_mask=padding_mask,
+                    adapter_mask=adapter_mask
+                )
                 enriched_tokens = output.last_hidden_state[0]
 
             tok_idx = 0
@@ -238,8 +250,17 @@ class SemanticChunker:
                 )
 
                 start_tok, end_tok = token_indices[0], token_indices[-1] + 1
-                token_embeddings = enriched_tokens[start_tok:end_tok, :].to(torch.float32)
-                chunks[cid].embedding = torch.mean(token_embeddings, dim=0).cpu().tolist()
+                embeddings.append(torch.mean(
+                    enriched_tokens[start_tok:end_tok, :],
+                    dim = 0,
+                    dtype=torch.float32
+                ))
+                cids.append(cid)
+
+        if embeddings:
+            stacked = torch.stack(embeddings, dim=0).cpu()
+            for idx, cid in enumerate(cids):
+                chunks[cid].embedding = stacked[idx].tolist()
 
 
     def embed_query(self, query: str) -> list[float]:
@@ -250,9 +271,24 @@ class SemanticChunker:
         token_ids = tokens["input_ids"].to(self._device)
         padding_mask = tokens["attention_mask"].to(self._device)
 
-        with torch.no_grad():
-            output = self._model(input_ids=token_ids, attention_mask=padding_mask)
+        adapter_mask = torch.full(
+            (token_ids.shape[0],),
+            self._model._adaptation_map["retrieval.query"],
+            dtype=torch.int32
+        ).to(self._device)
+
+        with torch.inference_mode():
+            output = self._model(
+                input_ids=token_ids,
+                attention_mask=padding_mask,
+                adapter_mask=adapter_mask
+            )
+
             enriched_tokens = output.last_hidden_state[0]
-            embedding = torch.mean(enriched_tokens, dim=0).to(torch.float32)
+            embedding = torch.mean(
+                enriched_tokens,
+                dim=0,
+                dtype=torch.float32
+            )
 
         return embedding.cpu().tolist()
