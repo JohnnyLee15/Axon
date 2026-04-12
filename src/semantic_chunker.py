@@ -1,11 +1,24 @@
-# Suppress logging
+# Suppress logging from other libraries
 import logging
+import warnings
 logging.disable(logging.INFO)
+logging.disable(logging.CRITICAL)
+warnings.filterwarnings("ignore")
 
-# Suppress irrelevant warnings
-import transformers
-transformers.logging.set_verbosity_error()
+import os
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+from transformers import logging as trans_log
+trans_log.set_verbosity_error()
+trans_log.disable_progress_bar()
+
+from huggingface_hub.utils import disable_progress_bars, logging as hf_log
+hf_log.set_verbosity_error()
+disable_progress_bars()
+
+# imports
 from config import *
 import torch
 import pysbd
@@ -15,6 +28,7 @@ from document_state import Block
 from typing import Callable
 from context_buffer_tracker import ContextBufferTracker
 from rich.console import Console
+from optimum.quanto import quantize, freeze, qint4
 
 class SemanticChunker:
     def __init__(self, console: Console):
@@ -23,17 +37,13 @@ class SemanticChunker:
         self._device = torch.device("mps")
         self._seg = pysbd.Segmenter(language="en", clean=False)
 
-        self._model = AutoModel.from_pretrained(
-            EMBEDDING_MODEL,
-            trust_remote_code=True,
-            dtype=torch.float16
-        ).to(self._device)
+        self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=torch.float16)
+        quantize(self._model, weights=qint4)
+        freeze(self._model)
+        self._model.to(self._device)
         self._model.eval()
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            EMBEDDING_MODEL,
-            trust_remote_code=True
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL)
         self._console = console
 
 
@@ -225,17 +235,11 @@ class SemanticChunker:
             # Grab [0] because HF expects batched inputs, so batched outputs
             offsets = tokens["offset_mapping"][0].tolist()
 
-            adapter_mask = torch.full(
-                (token_ids.shape[0],),
-                self._model._adaptation_map["retrieval.passage"],
-                dtype=torch.int32
-            ).to(self._device)
-
-            with torch.inference_mode():
+            with torch.no_grad():
                 output = self._model(
                     input_ids=token_ids,
                     attention_mask=padding_mask,
-                    adapter_mask=adapter_mask
+                    task="retrieval.passage"
                 )
                 enriched_tokens = output.last_hidden_state[0]
 
@@ -271,17 +275,11 @@ class SemanticChunker:
         token_ids = tokens["input_ids"].to(self._device)
         padding_mask = tokens["attention_mask"].to(self._device)
 
-        adapter_mask = torch.full(
-            (token_ids.shape[0],),
-            self._model._adaptation_map["retrieval.query"],
-            dtype=torch.int32
-        ).to(self._device)
-
-        with torch.inference_mode():
+        with torch.no_grad():
             output = self._model(
                 input_ids=token_ids,
                 attention_mask=padding_mask,
-                adapter_mask=adapter_mask
+                task="retrieval.query"
             )
 
             enriched_tokens = output.last_hidden_state[0]

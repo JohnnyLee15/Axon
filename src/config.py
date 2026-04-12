@@ -66,8 +66,8 @@ JACCARD_CUTOFF = 0.84
 NORMALIZE_DOC_PATTERN = re.compile(r"[^a-z0-9]")
 
 # ------ Semantic Chunker Constants ------
-EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
-MAX_JINA_TOKS = 4096
+EMBEDDING_MODEL = "jinaai/jina-embeddings-v3-hf"
+MAX_JINA_TOKS = 2048
 MAX_HEADER_CHARS = 250
 MAX_HEADER_STACK_CHARS = 600
 MIN_CHUNK_CHARS = 300

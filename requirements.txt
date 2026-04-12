@@ -1,11 +1,25 @@
-docling
-rich
-torch
-transformers
-einops
-pysbd
-sqlite-vec
-google.genai
-prompt_toolkit
-datasketch
-xxhash
+# --- Core AI & ML ---
+torch==2.11.0
+torchvision==0.26.0
+transformers==5.5.3
+einops==0.8.2
+accelerate==1.13.0
+peft==0.18.1
+optimum-quanto==0.2.7
+
+# --- Document Processing ---
+docling==2.86.0
+docling-core==2.73.0
+docling-ibm-models==3.13.0
+docling-parse==5.8.0
+pysbd==0.3.4
+
+# --- Search & Data ---
+sqlite-vec==0.1.9
+datasketch==1.9.0
+xxhash==3.6.0
+
+# --- CLI & API ---
+rich==14.3.4
+prompt_toolkit==3.0.52
+google-genai==1.72.0

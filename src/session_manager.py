@@ -259,7 +259,7 @@ class SessionManager:
 
         return False
 
-
+    # TODO: put in separate class
     def _get_active_ids(self, parsed_doc: ParsedDoc) -> list[str]:
         active_ids = []
         if parsed_doc.doi:
