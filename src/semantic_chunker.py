@@ -28,7 +28,7 @@ from document_state import Block
 from typing import Callable
 from context_buffer_tracker import ContextBufferTracker
 from rich.console import Console
-from optimum.quanto import quantize, freeze, qint4
+# from optimum.quanto import quantize, freeze, qint4
 
 class SemanticChunker:
     def __init__(self, console: Console):
@@ -38,8 +38,8 @@ class SemanticChunker:
         self._seg = pysbd.Segmenter(language="en", clean=False)
 
         self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=torch.float16)
-        quantize(self._model, weights=qint4)
-        freeze(self._model)
+        # quantize(self._model, weights=qint4)
+        # freeze(self._model)
         self._model.to(self._device)
         self._model.eval()
 

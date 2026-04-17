@@ -58,7 +58,6 @@ CHAT_TABLE = "chats"
 LSH_TABLE = "lsh"
 FTS_TABLE = "fts"
 INITIAL_CHUNK_K = 20
-FINAL_CHUNK_K = 5
 REPLACE_WHITESPACE_WITH_SPACE = re.compile(r'\s+')
 
 # ------ MinHasher Constants ------
@@ -91,6 +90,11 @@ REFERENCE_HEADERS = [
     "reference list",
     "selected bibliography"
 ]
+
+# ------ ReRanker Constants ------
+MLX_RERANKER = "jinaai/jina-reranker-v3-mlx"
+RERANK_BATCH_SIZE = 10
+FINAL_CHUNK_K = 5
 
 EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PAGE_HEADER,

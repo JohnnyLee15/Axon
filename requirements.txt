@@ -6,6 +6,9 @@ einops==0.8.2
 accelerate==1.13.0
 peft==0.18.1
 optimum-quanto==0.2.7
+mlx==0.31.1
+mlx-lm==0.31.2
+tiktoken==0.12.0
 
 # --- Document Processing ---
 docling==2.86.0
