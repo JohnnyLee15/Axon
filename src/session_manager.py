@@ -192,7 +192,7 @@ class SessionManager:
 
         if arg == "-a":
             self._console.print("\n⚠️  [bold yellow]WARNING: This will permanently delete ALL saved chats.[/bold yellow]")
-            confirm = self._console.input("❓ [bold]Are you sure? [cyan](y/n)[/cyan]: [/bold]")
+            confirm = self._console.input("❓ [bold]Are you sure? ([cyan]y/n[/cyan]): [/bold]")
 
             if confirm.strip().lower() == "y":
                 success = self._db.delete_all_chats()
@@ -253,7 +253,7 @@ class SessionManager:
             if jaccard_estimate >= JACCARD_CUTOFF:
                 self._console.print(
                     f"🛑 [bold yellow]Duplicate content detected ([cyan]ID: {cand_pid}[/cyan], "
-                    f"[cyan]Similarity: [cyan]{jaccard_estimate:.3f}[/cyan]). Skipping.[/bold yellow]"
+                    f"[cyan]Similarity: {jaccard_estimate:.3f}[/cyan]). Skipping.[/bold yellow]"
                 )
                 return True
 
@@ -291,7 +291,7 @@ class SessionManager:
 
             if exists:
                 id_str = self._get_active_ids(parsed_doc)
-                self._console.print(f"🛑 [bold yellow]Duplicate metadata detected [cyan]({id_str})[/cyan]. Skipping.[/bold yellow]")
+                self._console.print(f"🛑 [bold yellow]Duplicate metadata detected ([cyan]{id_str}[/cyan]). Skipping.[/bold yellow]")
                 return
 
         sig_bytes, band_hashes = self._minhasher.minhash_doc(parsed_doc.full_raw_text)
@@ -328,7 +328,7 @@ class SessionManager:
         if not pdf_files:
             return
 
-        self._console.print(f"\n🚀 [bold]Starting Axon Ingestion Pipeline [cyan]({len(pdf_files)} PDF files)[/cyan][/bold]")
+        self._console.print(f"\n🚀 [bold]Starting Axon Ingestion Pipeline ([cyan]{len(pdf_files)} PDF files[/cyan])[/bold]")
         for pdf_path in pdf_files:
             self._console.print()
             self._console.rule(f"[bold cyan]{pdf_path.name}[/bold cyan]", style="bold")
@@ -345,7 +345,7 @@ class SessionManager:
 
     def _clear_db(self):
         self._console.print("\n⚠️  [bold yellow]WARNING: This will permanently delete ALL papers, chunks, embeddings, and saved chats.[/bold yellow]")
-        confirm = self._console.input("❓ [bold]Are you sure? [cyan](y/n)[/cyan]: [/bold]")
+        confirm = self._console.input("❓ [bold]Are you sure? ([cyan]y/n[/cyan]): [/bold]")
         if confirm.strip().lower() == 'y':
             self._db.reset()
             self._console.print("\n💥 [bold]Vector database completely cleared![/bold]")

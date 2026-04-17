@@ -12,7 +12,7 @@ class ChatLLM:
         self._console = console
         self._auto_compact_enabled = False
         self._chat_roll_enabled = False
-        self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
+        self._client = genai.Client(api_key=os.getenv("GEM_API_KEY"))
         self._history = []
 
 

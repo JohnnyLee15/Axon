@@ -23,3 +23,6 @@ xxhash==3.6.0
 rich==14.3.4
 prompt_toolkit==3.0.52
 google-genai==1.72.0
+
+# --- Environment / Config ---
+python-dotenv==1.2.2

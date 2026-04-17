@@ -9,8 +9,13 @@ from google import genai
 from docling.datamodel.base_models import DocItemLabel
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions, AcceleratorDevice
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+    AcceleratorOptions,
+    AcceleratorDevice
+)
+
 from config import *
 from document_state import DocumentState, ParsedDoc
 from rich.console import Console
@@ -27,10 +32,13 @@ class PdfParser:
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
 
         # TODO: Implement universal device detection (CUDA, MPS, XPU)
-        device = AcceleratorDevice.MPS
-
-        pipeline_opts = PdfPipelineOptions()
-        pipeline_opts.accelerator_options = AcceleratorOptions(device=device)
+        pipeline_opts = PdfPipelineOptions(
+            do_ocr=False,
+            accelerator_options=AcceleratorOptions(
+                num_threads=8,
+                device=AcceleratorDevice.MPS
+            )
+        )
 
         self._converter = DocumentConverter(
             format_options={

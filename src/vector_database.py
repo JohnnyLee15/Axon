@@ -24,20 +24,8 @@ class VectorDatabase:
     def _init_db(self) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
-        create_chunks_table = f"""
-            CREATE TABLE IF NOT EXISTS {CHUNK_TABLE} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                paper_id INTEGER NOT NULL CHECK (paper_id > 0) REFERENCES {PAPER_TABLE}(id) ON DELETE CASCADE,
-                chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
-                markdown TEXT NOT NULL
-            );
-        """
-        create_vec_table = f"""
-            CREATE VIRTUAL TABLE IF NOT EXISTS {VEC_TABLE} USING vec0 (
-                id INTEGER PRIMARY KEY,
-                embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine
-            );
-        """
+
+        # --- TABLES ---
         create_paper_table = f"""
             CREATE TABLE IF NOT EXISTS {PAPER_TABLE} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +37,16 @@ class VectorDatabase:
                 minhash_sig BLOB NOT NULL
             );
         """
+
+        create_chunks_table = f"""
+            CREATE TABLE IF NOT EXISTS {CHUNK_TABLE} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                paper_id INTEGER NOT NULL CHECK (paper_id > 0) REFERENCES {PAPER_TABLE}(id) ON DELETE CASCADE,
+                chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+                markdown TEXT NOT NULL
+            );
+        """
+
         create_lsh_table = f"""
             CREATE TABLE IF NOT EXISTS {LSH_TABLE} (
                 paper_id INTEGER NOT NULL REFERENCES {PAPER_TABLE}(id) ON DELETE CASCADE,
@@ -57,10 +55,7 @@ class VectorDatabase:
                 PRIMARY KEY (paper_id, band_idx)
             ) WITHOUT ROWID;
         """
-        create_lsh_lookup_index = f"""
-            CREATE INDEX IF NOT EXISTS idx_{LSH_TABLE}_lookup
-            ON {LSH_TABLE} (band_idx, band_hash)
-        """
+
         create_chats_table = f"""
             CREATE TABLE IF NOT EXISTS {CHAT_TABLE} (
                 name TEXT PRIMARY KEY,
@@ -68,12 +63,76 @@ class VectorDatabase:
             );
         """
 
+        # --- VIRTUAL TABLES ---
+        create_fts_table = f"""
+            CREATE VIRTUAL TABLE IF NOT EXISTS {FTS_TABLE} USING fts5 (
+                markdown,
+                content_rowid='id',
+                content='{CHUNK_TABLE}',
+                tokenize='unicode61'
+            );
+        """
+
+        create_vec_table = f"""
+            CREATE VIRTUAL TABLE IF NOT EXISTS {VEC_TABLE} USING vec0 (
+                id INTEGER PRIMARY KEY,
+                embedding FLOAT[{EMBEDDING_DIM}] distance_metric=cosine
+            );
+        """
+
+        # --- TRIGGERS ---
+        create_fts_insert_trigger = f"""
+            CREATE TRIGGER IF NOT EXISTS {CHUNK_TABLE}_after_insert
+            AFTER INSERT ON {CHUNK_TABLE}
+            BEGIN
+                INSERT INTO {FTS_TABLE} (
+                    rowid,
+                    markdown
+                )
+                VALUES (new.id, new.markdown);
+            END;
+        """
+
+        create_fts_delete_trigger = f"""
+            CREATE TRIGGER IF NOT EXISTS {CHUNK_TABLE}_after_delete
+            AFTER DELETE ON {CHUNK_TABLE}
+            BEGIN
+                INSERT INTO {FTS_TABLE} (
+                    {FTS_TABLE},
+                    rowid,
+                    markdown
+                )
+                VALUES ('delete', old.id, old.markdown);
+            END;
+        """
+
+        create_vec_delete_trigger = f"""
+            CREATE TRIGGER IF NOT EXISTS {CHUNK_TABLE}_after_delete_vec
+            AFTER DELETE ON {CHUNK_TABLE}
+            BEGIN
+                DELETE FROM {VEC_TABLE} WHERE id = old.id;
+            END;
+        """
+
+        # --- INDEXES ---
+        create_lsh_lookup_index = f"""
+            CREATE INDEX IF NOT EXISTS idx_{LSH_TABLE}_lookup
+            ON {LSH_TABLE} (band_idx, band_hash)
+        """
+
         try:
             cursor.execute(create_paper_table)
             cursor.execute(create_chunks_table)
-            cursor.execute(create_vec_table)
             cursor.execute(create_lsh_table)
             cursor.execute(create_chats_table)
+
+            cursor.execute(create_fts_table)
+            cursor.execute(create_vec_table)
+
+            cursor.execute(create_fts_insert_trigger)
+            cursor.execute(create_fts_delete_trigger)
+            cursor.execute(create_vec_delete_trigger)
+
             cursor.execute(create_lsh_lookup_index)
             conn.commit()
 
@@ -92,6 +151,7 @@ class VectorDatabase:
         drop_vec = f"DROP TABLE IF EXISTS {VEC_TABLE};"
         drop_chunks = f"DROP TABLE IF EXISTS {CHUNK_TABLE};"
         drop_lsh = f"DROP TABLE IF EXISTS {LSH_TABLE};"
+        drop_fts = f"DROP TABLE IF EXISTS {FTS_TABLE};"
         drop_papers = f"DROP TABLE IF EXISTS {PAPER_TABLE};"
         drop_chats = f"DROP TABLE IF EXISTS {CHAT_TABLE};"
 
@@ -99,12 +159,15 @@ class VectorDatabase:
             cursor.execute(drop_vec)
             cursor.execute(drop_chunks)
             cursor.execute(drop_lsh)
+            cursor.execute(drop_fts)
             cursor.execute(drop_papers)
             cursor.execute(drop_chats)
             conn.commit()
 
             cursor.execute("VACUUM")
+
             return True
+
         except sqlite3.Error as e:
             conn.rollback()
             self._console.print(f"\n🧹 [bold red]Error dropping tables during database clear: {e}[/bold red]")
@@ -419,23 +482,21 @@ class VectorDatabase:
         return None
 
 
-    def _get_top_k_chunks(self, query_embedding: list[float]) -> list[tuple]:
+    def _get_top_k_vector_ids(self, query_embedding: list[float]) -> list[tuple]:
         conn = self._get_connection()
         cursor = conn.cursor()
         rows = []
         sql = f"""
             SELECT
+                c.id,
                 c.paper_id,
                 c.chunk_index,
-                c.markdown,
-                v.distance
+                c.markdown
             FROM {VEC_TABLE} v
             JOIN {CHUNK_TABLE} c
                 ON c.id = v.id
             WHERE v.embedding MATCH ?
-                AND k = {CHUNKS_MATCHED}
-                AND v.distance <= {MAX_COS_DIST}
-            ORDER BY c.paper_id, c.chunk_index;
+                AND k = {INITIAL_CHUNK_K}
         """
 
         try:
@@ -446,7 +507,7 @@ class VectorDatabase:
             rows = cursor.fetchall()
 
         except sqlite3.Error as e:
-            self._console.print(f"\n🔍 [bold red]Error retrieving top {CHUNKS_MATCHED} chunks: {e}[/bold red]")
+            self._console.print(f"\n🔍 [bold red]Error retrieving top {INITIAL_CHUNK_K} vector chunks: {e}[/bold red]")
 
         finally:
             cursor.close()
@@ -455,27 +516,85 @@ class VectorDatabase:
         return rows
 
 
-    def get_formatted_chunks(self, query_embedding: list[float]) -> str | None:
-        rows = self._get_top_k_chunks(query_embedding)
-        if not rows:
-            return None
+    def _get_top_k_bm25_ids(self, query: str) -> list[tuple]:
+        query = REPLACE_WHITESPACE_WITH_SPACE.sub(" ", query)
+        tokens = query.split()
+        query = " OR ".join(f'"{tok.replace(chr(34), chr(34)*2)}"' for tok in tokens)
 
-        curr_paper_id = None
-        parts = []
-        for row in rows:
-            paper_id, chunk_index, markdown, _ = row
-            if paper_id != curr_paper_id:
-                if curr_paper_id is not None:
-                    parts.append("</document>")
-                curr_paper_id = paper_id
-                parts.append(f"<document id='{paper_id}'>")
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        rows = []
+        sql = f"""
+            SELECT
+                c.id,
+                c.paper_id,
+                c.chunk_index,
+                c.markdown
+            FROM {FTS_TABLE}
+            JOIN {CHUNK_TABLE} c
+                ON {FTS_TABLE}.rowid = c.id
+            WHERE {FTS_TABLE} MATCH ?
+            ORDER BY bm25({FTS_TABLE})
+            LIMIT {INITIAL_CHUNK_K}
+        """
 
-            parts.append(f"<chunk id='{chunk_index}'>")
-            parts.append(markdown)
-            parts.append("</chunk>")
+        try:
+            cursor.execute(sql, (query,))
+            return cursor.fetchall()
 
-        parts.append("</document>")
-        return "\n".join(parts)
+        except Exception as e:
+            self._console.print(f"\n🔍 [bold red]Error retrieving top {INITIAL_CHUNK_K} BM25 chunks: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return rows
+
+
+    def top_chunk_matches(self, query: str, query_embedding: list[float]) -> dict[int, dict[str, str | int]]:
+        bm25_chunks = self._get_top_k_bm25_ids(query)
+        vec_chunks = self._get_top_k_vector_ids(query_embedding)
+
+        chunks = {}
+        for cid, pid, cidx, text in bm25_chunks:
+            chunks[cid] = {
+                "paper_id": pid,
+                "chunk_index": cidx,
+                "text": text
+            }
+
+        for cid, pid, cidx, text in vec_chunks:
+            chunks[cid] = {
+                "paper_id": pid,
+                "chunk_index": cidx,
+                "text": text
+            }
+
+        return chunks
+
+
+    # def get_formatted_chunks(self, query_embedding: list[float]) -> str | None:
+    #     rows = self._get_top_k_vector_ids(query_embedding)
+    #     if not rows:
+    #         return None
+
+    #     curr_paper_id = None
+    #     parts = []
+    #     for row in rows:
+    #         paper_id, chunk_index, markdown, _ = row
+    #         if paper_id != curr_paper_id:
+    #             if curr_paper_id is not None:
+    #                 parts.append("</document>")
+    #             curr_paper_id = paper_id
+    #             parts.append(f"<document id='{paper_id}'>")
+
+    #         parts.append(f"<chunk id='{chunk_index}'>")
+    #         parts.append(markdown)
+    #         parts.append("</chunk>")
+
+    #     parts.append("</document>")
+    #     return "\n".join(parts)
 
 
 

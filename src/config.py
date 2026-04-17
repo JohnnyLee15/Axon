@@ -4,6 +4,7 @@ Contains constants needed for python files within the src directory
 from docling.datamodel.base_models import DocItemLabel
 import re
 from pathlib import Path
+from dotenv import load_dotenv
 
 # ------ Block Processing Constants ------
 DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+")
@@ -46,6 +47,8 @@ ROOT_DIR = Path(__file__).parent.parent
 DATA_DIR = ROOT_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = str(DATA_DIR / "papers.db")
+ENV_PATH = Path(__file__).parent.parent / ".env"
+load_dotenv(ENV_PATH)
 
 # ------ DB Constants ------
 CHUNK_TABLE = "chunks"
@@ -53,8 +56,10 @@ VEC_TABLE = "vec"
 PAPER_TABLE = "papers"
 CHAT_TABLE = "chats"
 LSH_TABLE = "lsh"
-CHUNKS_MATCHED = 5
-MAX_COS_DIST = 0.45
+FTS_TABLE = "fts"
+INITIAL_CHUNK_K = 20
+FINAL_CHUNK_K = 5
+REPLACE_WHITESPACE_WITH_SPACE = re.compile(r'\s+')
 
 # ------ MinHasher Constants ------
 LSH_BANDS = 16
