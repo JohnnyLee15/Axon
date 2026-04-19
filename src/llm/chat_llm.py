@@ -71,7 +71,6 @@ class ChatLLM:
 
     def rewrite_query(self, query: str) -> str:
         #TODO: Add check to ensure returned query is <-8000 chars
-        #TODO: Change rewriter to attempt rewrite if needed
         recent_turns = self._history[-REWRITE_MESSAGES:]
 
         transcript = ""
@@ -185,7 +184,6 @@ class ChatLLM:
         return None
 
 
-    #TODO: fix thinking prints in middle of thinking
     def compact(self) -> str | None:
         if not self._history:
             self._console.print("\n📭 [bold yellow]Chat history is empty. Nothing to compact.[/bold yellow]")

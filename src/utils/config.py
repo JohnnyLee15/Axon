@@ -78,7 +78,7 @@ MIN_CHUNK_CHARS = 300
 MAX_CHUNK_CHARS = 1500
 EMBEDDING_DIM=1024
 WS_RE = re.compile(r'.*(\s)')
-MAX_QUERY_CHARS = 8000
+MAX_EMBEDDING_TOKS = 8192
 
 # ------ Docling Parser Configurations ------
 REFERENCE_HEADERS = [

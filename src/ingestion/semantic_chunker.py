@@ -268,10 +268,13 @@ class SemanticChunker:
 
 
     def embed_query(self, query: str) -> list[float]:
-        if len(query) > MAX_QUERY_CHARS:
-            raise ValueError(f"Query exceeds maximum character limit of {MAX_QUERY_CHARS}")
+        tokens = self._tokenizer(
+            query,
+            return_tensors="pt",
+            max_length=MAX_EMBEDDING_TOKS,
+            truncation=True
+        )
 
-        tokens = self._tokenizer(query, return_tensors="pt")
         token_ids = tokens["input_ids"].to(self._device)
         padding_mask = tokens["attention_mask"].to(self._device)
 
