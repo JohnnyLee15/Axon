@@ -552,9 +552,50 @@ class VectorDatabase:
         return rows
 
 
-    def top_chunk_matches(self, query: str, query_embedding: list[float]) -> dict[int, dict[str, str | int]]:
+    def get_papers_by_ids(self, ids: list[int]) -> list[tuple] | None:
+        if not ids:
+            return None
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        place_holders = ", ".join("?" for _ in ids)
+        sql = f"""
+        SELECT
+            title,
+            doi,
+            arxiv,
+            pmcid,
+            pmid
+        FROM {PAPER_TABLE}
+        WHERE id IN ({place_holders})
+        """
+        params = (*ids,)
+
+        try:
+            cursor.execute(sql, params)
+            return cursor.fetchall()
+
+        except Exception as e:
+            self._console.print(f"\n🔍 [bold red]Error retrieving papers: {e}[/bold red]")
+
+        finally:
+            cursor.close()
+            conn.close()
+
+        return None
+
+
+    def top_chunk_matches(
+        self,
+        query: str,
+        query_embedding: list[float]
+    ) -> dict[int, dict[str, str | int]] | None:
         bm25_chunks = self._get_top_k_bm25_ids(query)
         vec_chunks = self._get_top_k_vector_ids(query_embedding)
+
+        if not bm25_chunks and not vec_chunks:
+            return None
 
         chunks = {}
         for cid, pid, cidx, text in bm25_chunks:
@@ -572,31 +613,4 @@ class VectorDatabase:
             }
 
         return chunks
-
-
-    # def get_formatted_chunks(self, query_embedding: list[float]) -> str | None:
-    #     rows = self._get_top_k_vector_ids(query_embedding)
-    #     if not rows:
-    #         return None
-
-    #     curr_paper_id = None
-    #     parts = []
-    #     for row in rows:
-    #         paper_id, chunk_index, markdown, _ = row
-    #         if paper_id != curr_paper_id:
-    #             if curr_paper_id is not None:
-    #                 parts.append("</document>")
-    #             curr_paper_id = paper_id
-    #             parts.append(f"<document id='{paper_id}'>")
-
-    #         parts.append(f"<chunk id='{chunk_index}'>")
-    #         parts.append(markdown)
-    #         parts.append("</chunk>")
-
-    #     parts.append("</document>")
-    #     return "\n".join(parts)
-
-
-
-
 

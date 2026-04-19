@@ -1,13 +1,9 @@
 from datasketch import MinHash
 import xxhash
 import numpy as np
-from rich.console import Console
 from config import *
 
 class MinHasher:
-    def __init__(self, console: Console) -> None:
-        self._console = console
-
     # uint64 -> signed int 64
     def _u64_to_s64(self, val: int) -> int:
         return val if val < (1 << 63) else val - (1 << 64)

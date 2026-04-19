@@ -80,6 +80,7 @@ class AxonUI:
         )
 
 
+    # TODO: Add latex -> unicode renderer
     def stream_response(self, response: str) -> None:
         display_text = "<br>**[Axon] >** "
 
@@ -152,3 +153,28 @@ class AxonUI:
 
         self._console.print("\n")
         self._console.print(panel)
+
+
+    def display_references(self, papers: list[tuple]) -> None:
+        self._console.print()
+        self._console.rule(style="bold")
+        self._console.print("📚 [bold]References[/bold]")
+
+        for i, (title, doi, arxiv, pmcid, pmid) in enumerate(papers, start=1):
+            title = title if title else "Unknown Title"
+
+            identifiers = {
+                "DOI": doi,
+                "arXiv": arxiv,
+                "PMCID": pmcid,
+                "PMID": pmid
+            }
+
+            id_str = " • ".join(
+                f"{paper_id}: {identifiers[paper_id]}" for paper_id in identifiers
+                if identifiers[paper_id] is not None
+            )
+            self._console.print(f"\n  [bold][[cyan]{i}[/cyan]] {title}[/bold]")
+
+            if id_str:
+                self._console.print(f"    • {id_str}", highlight=False)

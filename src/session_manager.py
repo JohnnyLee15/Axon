@@ -6,6 +6,10 @@ from chat_llm import ChatLLM
 from min_hasher import MinHasher
 from document_state import ParsedDoc
 from config import *
+from mlx_chunk_reranker import MLXChunkReranker
+from torch_chunk_reranker import TorchChunkReranker
+from device_utils import get_torch_device
+
 from rich.console import Console
 from typing import Any
 import os
@@ -21,7 +25,9 @@ class SessionManager:
         self._db = VectorDatabase(self._console)
         self._ui = AxonUI(self._console)
         self._llm = ChatLLM(self._console)
-        self._minhasher = MinHasher(self._console)
+        self._minhasher = MinHasher()
+        self._reranker = None
+        self._init_reranker()
 
         self._CHAT_COMMANDS = {
             "save": {
@@ -127,6 +133,15 @@ class SessionManager:
                 "run": self._help
             }
         }
+
+
+    def _init_reranker(self) -> None:
+        device = get_torch_device()
+
+        if device.type == "mps":
+            self._reranker = MLXChunkReranker()
+        else:
+            self._reranker = TorchChunkReranker()
 
 
     def _select_item_from_id_dict(self, id_dicts: list[dict[str, str]]) -> Any:
@@ -436,6 +451,48 @@ class SessionManager:
         return result if result is not None else False
 
 
+    def _format_chunks(self, chunks: dict[int, dict[str, str | int]]) -> str | None:
+        if not chunks:
+            return None
+
+        sorted_chunks = dict(sorted(chunks.items(), key=lambda x: x[0]))
+        curr_paper_id = None
+        parts = []
+
+        for chunk_data in sorted_chunks.values():
+            paper_id = chunk_data["paper_id"]
+            chunk_index = chunk_data["chunk_index"]
+            markdown = chunk_data["text"]
+
+            if paper_id != curr_paper_id:
+                if curr_paper_id is not None:
+                    parts.append("</document>")
+                curr_paper_id = paper_id
+                parts.append(f"<document id='{paper_id}'>")
+
+            parts.append(f"<chunk id='{chunk_index}'>")
+            parts.append(markdown)
+            parts.append("</chunk>")
+
+        parts.append("</document>")
+        return "\n".join(parts)
+
+
+    def _display_references(self, chunks: dict[int, dict[str, str | int]]):
+        if not chunks:
+            return
+
+        paper_ids = set()
+        for chunk in chunks.values():
+            paper_ids.add(chunk["paper_id"])
+
+        paper_properties = self._db.get_papers_by_ids(list(paper_ids))
+        if not paper_properties:
+            return
+
+        self._ui.display_references(paper_properties)
+
+
     def run(self) -> None:
         done = False
         while not done:
@@ -449,15 +506,17 @@ class SessionManager:
                 done = self._process_cmd(user_input)
                 continue
 
-            #TODO: fix thinking prints in middle of thinking
             with self._ui.wait():
                 search_query = self._llm.rewrite_query(user_input)
                 embedding = self._chunker.embed_query(search_query)
-                chunks = self._db.get_formatted_chunks(embedding)
-                response = self._llm.query_chat(user_input, chunks)
+                chunks = self._db.top_chunk_matches(search_query, embedding)
+                best_chunks = self._reranker.rank_chunks(search_query, chunks)
+                formatted_chunks = self._format_chunks(best_chunks)
+                response = self._llm.query_chat(user_input, formatted_chunks)
 
             if response is not None:
                 self._ui.stream_response(response)
+                self._display_references(best_chunks)
 
 
 

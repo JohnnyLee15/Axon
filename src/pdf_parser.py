@@ -10,13 +10,10 @@ from docling.datamodel.base_models import DocItemLabel
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
-from docling.datamodel.pipeline_options import (
-    PdfPipelineOptions,
-    AcceleratorOptions,
-    AcceleratorDevice
-)
+from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
 
 from config import *
+from device_utils import get_docling_device
 from document_state import DocumentState, ParsedDoc
 from rich.console import Console
 from pathlib import Path
@@ -31,12 +28,11 @@ class PdfParser:
         self._model = LLM_CURATION_MODEL
         self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
 
-        # TODO: Implement universal device detection (CUDA, MPS, XPU)
         pipeline_opts = PdfPipelineOptions(
             do_ocr=False,
             accelerator_options=AcceleratorOptions(
                 num_threads=8,
-                device=AcceleratorDevice.MPS
+                device=get_docling_device()
             )
         )
 

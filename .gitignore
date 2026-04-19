@@ -1,6 +1,6 @@
 .env
 .DS_Store
 test*
-axon-venv
+axon_venv
 __pycache__
 data/

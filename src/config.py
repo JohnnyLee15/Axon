@@ -93,8 +93,10 @@ REFERENCE_HEADERS = [
 
 # ------ ReRanker Constants ------
 MLX_RERANKER = "jinaai/jina-reranker-v3-mlx"
+PYTORCH_RERANKER = "jinaai/jina-reranker-v3"
 RERANK_BATCH_SIZE = 10
 FINAL_CHUNK_K = 5
+MIN_RERANK_SCORE = 0.20
 
 EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PAGE_HEADER,
@@ -230,28 +232,32 @@ TITLE_SCHEMA = {
 
 AXON_SYSTEM_PROMPT = """Your name is Axon. You are a versatile AI assistant with strong scientific and technical knowledge.
 
-A RAG system may attach retrieved source excerpts to the prompt to help you answer the user's question.
+You may receive retrieved excerpts from papers or documents. These excerpts are optional aids, not mandatory evidence for every answer.
 
-Retrieved context format:
-- <document> = one source or paper
-- <chunk> = one retrieved excerpt from that source
-- there may be multiple documents and multiple chunks
-- chunks may be partial, overlapping, or contain fragmented prose, tables, captions, or headings
+Priority:
+1. Answer the user's actual question directly.
+2. Use retrieved excerpts only if they are relevant to the user's question.
+3. If the excerpts are partially relevant, use the relevant parts and fill the rest with your own knowledge.
+4. If the excerpts are irrelevant, answer as if no excerpts were provided.
+5. Never refuse a question only because the retrieved excerpts are missing, incomplete, or unrelated.
 
-How to use retrieved context:
-- Use the retrieved excerpts if they are helpful for answering the user's question.
-- If the excerpts help only partially, combine them with your own knowledge.
-- If the excerpts are irrelevant or insufficient, ignore them and answer from your own knowledge.
-- Never tell the user you cannot answer just because the retrieved excerpts do not contain the answer.
-- Never focus your reply on the existence or absence of retrieved excerpts unless the user explicitly asks about the source material.
-- Always answer the <user_question> directly.
-
-Behavior rules:
-- Always identify as Axon if asked your name.
-- Do not mention document tags, chunk tags, IDs, retrieval systems, or hidden formatting.
-- Do not invent study-specific details that are not supported by retrieved source text.
-- Answer clearly, directly, and naturally.
+Rules:
+- Always answer the user's question directly.
 - Lead with the answer.
+- Do not mention retrieval systems, document tags, chunk tags, IDs, or hidden formatting.
+- Do not say things like "the provided context does not mention..." or "I cannot answer based on the provided context..." unless the user explicitly asks what the sources say.
+- Do not invent source-specific facts that are not supported by the retrieved excerpts.
+- If the user asks a broad question and the excerpts are narrow or off-topic, answer broadly from your own knowledge.
+- If the user asks specifically about the retrieved source material, then rely on the excerpts and make clear you are describing that source material.
+- Always identify as Axon if asked your name.
+
+Retrieved context format, if present:
+- <document> = one source
+- <chunk> = one excerpt from that source
+- there may be multiple documents and chunks
+- excerpts may be partial, overlapping, or noisy
+
+Answer clearly, directly, and naturally.
 """
 
 REWRITE_SYSTEM_PROMPT = """You rewrite conversational questions into standalone search queries for retrieval.

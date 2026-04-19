@@ -27,17 +27,16 @@ from chunk_tracker import ChunkTracker, Chunk
 from document_state import Block
 from typing import Callable
 from context_buffer_tracker import ContextBufferTracker
+from device_utils import get_torch_device, get_dtype
 from rich.console import Console
 # from optimum.quanto import quantize, freeze, qint4
 
 class SemanticChunker:
     def __init__(self, console: Console):
-        # TODO: Implement universal device detection (CUDA, MPS, XPU)
-        # TODO: Implement CPU fallback to int4 or int8 quantization
-        self._device = torch.device("mps")
+        self._device = get_torch_device()
         self._seg = pysbd.Segmenter(language="en", clean=False)
 
-        self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=torch.float16)
+        self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=get_dtype())
         # quantize(self._model, weights=qint4)
         # freeze(self._model)
         self._model.to(self._device)
@@ -261,10 +260,9 @@ class SemanticChunker:
                 ))
                 cids.append(cid)
 
-        if embeddings:
-            stacked = torch.stack(embeddings, dim=0).cpu()
-            for idx, cid in enumerate(cids):
-                chunks[cid].embedding = stacked[idx].tolist()
+        stacked = torch.stack(embeddings, dim=0).cpu()
+        for idx, cid in enumerate(cids):
+            chunks[cid].embedding = stacked[idx].tolist()
 
 
     def embed_query(self, query: str) -> list[float]:
