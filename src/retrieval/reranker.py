@@ -1,5 +1,5 @@
-from device_utils import get_torch_device
-from config import *
+from src.utils.config import *
+
 from typing import Any
 
 class Reranker:

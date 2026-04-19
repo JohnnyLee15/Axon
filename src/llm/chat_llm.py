@@ -1,4 +1,5 @@
-from config import *
+from src.utils.config import *
+
 import os
 from google import genai
 from rich.console import Console

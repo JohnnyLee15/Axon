@@ -6,13 +6,16 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich import box
 from rich.spinner import Spinner
-from config import *
+
 import math
+import time
+
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import ANSI
-import time
-from select_menu import SelectMenu
+
+from src.utils.config import *
+from src.ui.select_menu import SelectMenu
 
 class AxonUI:
     def __init__(self, console: Console):

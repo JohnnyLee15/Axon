@@ -1,7 +1,8 @@
 from datasketch import MinHash
 import xxhash
 import numpy as np
-from config import *
+
+from src.utils.config import *
 
 class MinHasher:
     # uint64 -> signed int 64

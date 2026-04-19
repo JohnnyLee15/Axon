@@ -12,9 +12,10 @@ from docling.datamodel.base_models import InputFormat
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
 
-from config import *
-from device_utils import get_docling_device
-from document_state import DocumentState, ParsedDoc
+from src.utils.config import *
+from src.utils.device_utils import get_docling_device
+from src.trackers.document_state import DocumentState, ParsedDoc
+
 from rich.console import Console
 from pathlib import Path
 

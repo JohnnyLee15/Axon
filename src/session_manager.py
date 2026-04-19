@@ -1,14 +1,14 @@
-from semantic_chunker import SemanticChunker
-from pdf_parser import PdfParser
-from vector_database import VectorDatabase
-from axon_ui import AxonUI
-from chat_llm import ChatLLM
-from min_hasher import MinHasher
-from document_state import ParsedDoc
-from config import *
-from mlx_chunk_reranker import MLXChunkReranker
-from torch_chunk_reranker import TorchChunkReranker
-from device_utils import get_torch_device
+from src.ingestion.semantic_chunker import SemanticChunker
+from src.ingestion.pdf_parser import PdfParser
+from src.db.vector_database import VectorDatabase
+from src.ui.axon_ui import AxonUI
+from src.llm.chat_llm import ChatLLM
+from src.db.min_hasher import MinHasher
+from src.utils.paper_utils import get_active_ids
+from src.utils.config import *
+from src.retrieval.mlx_chunk_reranker import MLXChunkReranker
+from src.retrieval.torch_chunk_reranker import TorchChunkReranker
+from src.utils.device_utils import get_torch_device
 
 from rich.console import Console
 from typing import Any
@@ -274,23 +274,6 @@ class SessionManager:
 
         return False
 
-    # TODO: put in separate class
-    def _get_active_ids(self, parsed_doc: ParsedDoc) -> list[str]:
-        active_ids = []
-        if parsed_doc.doi:
-            active_ids.append(f"DOI: {parsed_doc.doi}")
-
-        if parsed_doc.arxiv:
-            active_ids.append(f"arXiv: {parsed_doc.arxiv}")
-
-        if parsed_doc.pmcid:
-            active_ids.append(f"PMCID: {parsed_doc.pmcid}")
-
-        if parsed_doc.pmid:
-            active_ids.append(f"PMID: {parsed_doc.pmid}")
-
-        return  ", ".join(active_ids) if active_ids else "Unknown"
-
 
     def _process_pdf(self, pdf_path: Path) -> int | None:
         parsed_doc = self._parser(pdf_path)
@@ -305,7 +288,7 @@ class SessionManager:
                 return
 
             if exists:
-                id_str = self._get_active_ids(parsed_doc)
+                id_str = get_active_ids(parsed_doc)
                 self._console.print(f"🛑 [bold yellow]Duplicate metadata detected ([cyan]{id_str}[/cyan]). Skipping.[/bold yellow]")
                 return
 

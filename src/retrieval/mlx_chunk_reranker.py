@@ -3,8 +3,8 @@ import os
 from huggingface_hub import snapshot_download
 import importlib
 
-from config import *
-from reranker import Reranker
+from src.utils.config import *
+from src.retrieval.reranker import Reranker
 
 class MLXChunkReranker(Reranker):
     def _init(self) -> None:

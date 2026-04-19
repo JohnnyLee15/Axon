@@ -1,9 +1,9 @@
 from huggingface_hub import snapshot_download
 from transformers import AutoModel
 
-from reranker import Reranker
-from config import *
-from device_utils import get_dtype, get_torch_device
+from src.retrieval.reranker import Reranker
+from src.utils.config import *
+from src.utils.device_utils import get_dtype, get_torch_device
 
 
 class TorchChunkReranker(Reranker):

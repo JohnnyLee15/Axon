@@ -43,11 +43,11 @@ CODE_BLOCK_PATTERN = re.compile(r'```(?:json)?\n?|```')
 REMOVE_FLAG = 0
 
 # ------ Path Constants ------
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = ROOT_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = str(DATA_DIR / "papers.db")
-ENV_PATH = Path(__file__).parent.parent / ".env"
+ENV_PATH = ROOT_DIR / ".env"
 load_dotenv(ENV_PATH)
 
 # ------ DB Constants ------

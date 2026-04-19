@@ -19,16 +19,18 @@ hf_log.set_verbosity_error()
 disable_progress_bars()
 
 # imports
-from config import *
+
 import torch
 import pysbd
 from transformers import AutoModel, AutoTokenizer
-from chunk_tracker import ChunkTracker, Chunk
-from document_state import Block
 from typing import Callable
-from context_buffer_tracker import ContextBufferTracker
-from device_utils import get_torch_device, get_dtype
 from rich.console import Console
+
+from src.utils.config import *
+from src.trackers.chunk_tracker import ChunkTracker, Chunk
+from src.trackers.document_state import Block
+from src.trackers.context_buffer_tracker import ContextBufferTracker
+from src.utils.device_utils import get_torch_device, get_dtype
 # from optimum.quanto import quantize, freeze, qint4
 
 class SemanticChunker:

@@ -1,8 +1,11 @@
 import sqlite3
 import sqlite_vec
-from config import *
-from chunk_tracker import Chunk
-from document_state import ParsedDoc
+
+from src.utils.config import *
+from src.trackers.chunk_tracker import Chunk
+from src.trackers.document_state import ParsedDoc
+from src.utils.paper_utils import get_active_ids
+
 import json
 from rich.console import Console
 
@@ -204,20 +207,7 @@ class VectorDatabase:
             return row is not None
 
         except Exception as e:
-            active_ids = []
-            if parsed_doc.doi:
-                active_ids.append(f"DOI: {parsed_doc.doi}")
-
-            if parsed_doc.arxiv:
-                active_ids.append(f"arXiv: {parsed_doc.arxiv}")
-
-            if parsed_doc.pmcid:
-                active_ids.append(f"PMCID: {parsed_doc.pmcid}")
-
-            if parsed_doc.pmid:
-                active_ids.append(f"PMID: {parsed_doc.pmid}")
-
-            id_str = ", ".join(active_ids) if active_ids else "No Identifiers"
+            id_str = get_active_ids(parsed_doc)
             self._console.print(f"\n❌ [bold red]Database Error checking metadata [cyan]({id_str})[/cyan]:[/bold red] {e}")
 
         finally:
