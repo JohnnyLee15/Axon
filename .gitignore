@@ -4,3 +4,4 @@ test*
 axon_venv
 __pycache__
 data/
+**/*.txt

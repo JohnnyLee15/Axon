@@ -14,6 +14,8 @@ from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import ANSI
 
+from pylatexenc.latex2text import LatexNodes2Text
+
 from src.utils.config import *
 from src.ui.select_menu import SelectMenu
 
@@ -21,6 +23,7 @@ class AxonUI:
     def __init__(self, console: Console):
         # TODO add a name to the database
         self._console = console
+        self._latex_converter = LatexNodes2Text()
         self._select_menu = SelectMenu()
         self._kb = KeyBindings()
         self._bind_keys()
@@ -83,8 +86,8 @@ class AxonUI:
         )
 
 
-    # TODO: Add latex -> unicode renderer
     def stream_response(self, response: str) -> None:
+        response = self._latex_converter.latex_to_text(response)
         display_text = "<br>**[Axon] >** "
 
         with Live(

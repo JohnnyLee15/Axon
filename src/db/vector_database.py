@@ -72,7 +72,7 @@ class VectorDatabase:
                 markdown,
                 content_rowid='id',
                 content='{CHUNK_TABLE}',
-                tokenize='unicode61'
+                tokenize='porter unicode61'
             );
         """
 
