@@ -542,7 +542,7 @@ class VectorDatabase:
         return rows
 
 
-    def get_papers_by_ids(self, ids: list[int]) -> list[tuple] | None:
+    def get_paper_metadata_by_id(self, ids: list[int]) -> list[tuple] | None:
         if not ids:
             return None
 

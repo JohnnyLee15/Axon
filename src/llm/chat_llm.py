@@ -4,6 +4,8 @@ import os
 from google import genai
 from rich.console import Console
 
+from typing import Any
+
 class ChatLLM:
     def __init__(self, console: Console):
         self._chat_model = LLM_CHAT_MODEL_DEFAULT
@@ -42,12 +44,12 @@ class ChatLLM:
 
 
     def toggle_auto_compact(self) -> bool:
-        self._auto_compact_enabled = True if not self._auto_compact_enabled else False
+        self._auto_compact_enabled = not self._auto_compact_enabled
         return self._auto_compact_enabled
 
 
     def toggle_chat_roll(self) -> bool:
-        self._chat_roll_enabled = True if not self._chat_roll_enabled else False
+        self._chat_roll_enabled = not self._chat_roll_enabled
         return self._chat_roll_enabled
 
 
@@ -69,15 +71,30 @@ class ChatLLM:
         return 0
 
 
+    def _stringify_history_chat(self, role: str, part: dict) -> str:
+        if "text" in part:
+            return f"{role}: {part['text']}"
+
+        if "function_call" in part:
+            fc = part["function_call"]
+            return f"{role}: called tool {fc['name']} with args {fc['args']}"
+
+        if "function_response" in part:
+            fr = part["function_response"]
+            result = fr["response"]["result"]
+            return f"{role}: tool {fr['name']} returned {result}"
+
+        return ""
+
+
     def rewrite_query(self, query: str) -> str:
-        #TODO: Add check to ensure returned query is <-8000 chars
         recent_turns = self._history[-REWRITE_MESSAGES:]
 
         transcript = ""
         for msg in recent_turns:
             role = "User" if msg["role"] == "user" else "Model"
-            content = msg["parts"][0]["text"]
-            transcript += f"{role}: {content}\n"
+            content = self._stringify_history_chat(role, msg["parts"][0])
+            transcript += f"{content}\n"
 
         user_content = (
             f"<chat_history>\n{transcript.strip()}\n</chat_history>\n"
@@ -109,22 +126,49 @@ class ChatLLM:
         )
 
 
-    def _add_history(self, user_input: str, response: str) -> None:
+    def add_user_history(self, user_input: str) -> None:
         self._history.append({
             "role": "user",
             "parts": [{"text": user_input}]
         })
+
+
+    def add_model_history(self, response: str) -> None:
         self._history.append({
             "role": "model",
             "parts": [{"text": response}]
         })
 
 
-    def _auto_compact(self, new_message: dict[str, str | list]) -> None:
+    def add_function_call_history(self, tool_name: str, tool_args: dict) -> None:
+        self._history.append({
+            "role": "model",
+            "parts": [{
+                "function_call": {
+                    "name": tool_name,
+                    "args": tool_args
+                }
+            }]
+        })
+
+
+    def add_function_response_history(self, tool_name: str, result: str) -> None:
+        self._history.append({
+            "role": "user",
+            "parts": [{
+                "function_response": {
+                    "name": tool_name,
+                    "response": {"result": result}
+                }
+            }]
+        })
+
+
+    def _auto_compact(self, new_message: dict[str, str | list] | None = None) -> None:
         if not self._auto_compact_enabled:
             return
 
-        payload = self._history + [new_message]
+        payload = self._history + ([new_message] if new_message else [])
         payload_len = self.get_token_count(payload)
 
         if payload_len > self._context_size:
@@ -150,7 +194,7 @@ class ChatLLM:
 
         self._apply_rolling_window()
         self._auto_compact(new_message)
-        payload= self._history + [new_message]
+        payload = self._history + [new_message]
         payload_len = self.get_token_count(payload)
 
         if payload_len > self._context_size:
@@ -175,8 +219,44 @@ class ChatLLM:
             )
 
             response_text = response.text.strip()
-            self._add_history(user_input, response_text)
+            self.add_user_history(user_input)
+            self.add_model_history(response_text)
             return response_text
+
+        except Exception as e:
+            self._console.print(f"\n❌ [bold red]Generation Error: {e}[/bold red]")
+
+        return None
+
+
+    def query_agent(self, tools: list) -> Any:
+        self._apply_rolling_window()
+        self._auto_compact()
+        payload_len = self.get_token_count(self._history)
+
+        if payload_len > self._context_size:
+            self._console.print(
+                "\n⚠️  [bold yellow]Context Limit Exceeded:[/bold yellow] "
+                f"[bold]Message requires [cyan]{payload_len}[/cyan] tokens "
+                f"(Limit: [cyan]{self._context_size}[/cyan]).[bold]"
+            )
+            self._console.print(
+                "💡 [dim]Try running [bold cyan]/chat compact[/bold cyan] "
+                "or [bold cyan]/chat roll[/bold cyan] to free up memory![/dim]")
+            return None
+
+        try:
+            response = self._client.models.generate_content(
+                model=self._chat_model,
+                contents=self._history,
+                config={
+                    "system_instruction": AXON_SYSTEM_PROMPT,
+                    "temperature": LLM_CHAT_TEMP,
+                    "tools": tools
+                }
+            )
+
+            return response
 
         except Exception as e:
             self._console.print(f"\n❌ [bold red]Generation Error: {e}[/bold red]")
@@ -192,8 +272,8 @@ class ChatLLM:
         transcript = ""
         for msg in self._history:
             role = "User" if msg["role"] == "user" else "Model"
-            content = msg["parts"][0]["text"]
-            transcript += f"{role}: {content}\n"
+            content = self._stringify_history_chat(role, msg["parts"][0])
+            transcript += f"{content}\n"
 
         compact_content = (
             "Compress the following conversation history into a self-contained "

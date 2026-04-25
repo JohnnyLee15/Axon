@@ -9,6 +9,7 @@ from src.utils.config import *
 from src.retrieval.mlx_chunk_reranker import MLXChunkReranker
 from src.retrieval.torch_chunk_reranker import TorchChunkReranker
 from src.utils.device_utils import get_torch_device
+from src.agent.agent_tools import AgentTools
 
 from rich.console import Console
 from typing import Any
@@ -26,9 +27,35 @@ class SessionManager:
         self._ui = AxonUI(self._console)
         self._llm = ChatLLM(self._console)
         self._minhasher = MinHasher()
-        self._reranker = None
+        self._agent_mode_enabled = False
         self._init_reranker()
+        self._init_cmds()
+        self._init_agent()
 
+
+    def _init_agent(self) -> None:
+        self._trusted_tools = set()
+        self._agent_tools = AgentTools(self._chunker, self._db, self._reranker)
+        self._tool_functions = {
+            "search_for_chunks": self._agent_tools.search_for_chunks
+        }
+        self._api_tools = [{
+            "function_declarations": [
+                SEARCH_FOR_CHUNKS
+            ]
+        }]
+
+
+    def _init_reranker(self) -> None:
+        device = get_torch_device()
+
+        if device.type == "mps":
+            self._reranker = MLXChunkReranker()
+        else:
+            self._reranker = TorchChunkReranker()
+
+
+    def _init_cmds(self) -> None:
         self._CHAT_COMMANDS = {
             "save": {
                 "usage": "/chat save <chat name> [-f]",
@@ -131,17 +158,14 @@ class SessionManager:
                 "desc": "Print a menu listing all available commands.",
                 "argc": 0,
                 "run": self._help
+            },
+            "agent": {
+                "usage": "/agent",
+                "desc": "Toggles Agent Mode on/off for complex autonomous research.",
+                "argc": 0,
+                "run": self._toggle_agent
             }
         }
-
-
-    def _init_reranker(self) -> None:
-        device = get_torch_device()
-
-        if device.type == "mps":
-            self._reranker = MLXChunkReranker()
-        else:
-            self._reranker = TorchChunkReranker()
 
 
     def _select_item_from_id_dict(self, id_dicts: list[dict[str, str]]) -> Any:
@@ -343,8 +367,8 @@ class SessionManager:
 
     def _clear_db(self):
         self._console.print("\n⚠️  [bold yellow]WARNING: This will permanently delete ALL papers, chunks, embeddings, and saved chats.[/bold yellow]")
-        confirm = self._console.input("❓ [bold]Are you sure? ([cyan]y/n[/cyan]): [/bold]")
-        if confirm.strip().lower() == 'y':
+        confirm = self._console.input("❓ [bold]Are you sure? ([cyan]y/n[/cyan]): [/bold]").strip().lower()
+        if confirm == 'y':
             self._db.reset()
             self._console.print("\n💥 [bold]Vector database completely cleared![/bold]")
         else:
@@ -367,6 +391,12 @@ class SessionManager:
         if response is not None:
             self._ui.stream_response(response)
             self._console.print(f"\n📦 [bold]Successfully compacted chat history![/bold]")
+
+
+    def _toggle_agent(self):
+        self._agent_mode_enabled = not self._agent_mode_enabled
+        status = "on" if self._agent_mode_enabled else "off"
+        self._console.print(f"\n🧠 [bold]Agent Mode successfully toggled [cyan]{status}[/cyan]![/bold]")
 
 
     def _auto_compact(self):
@@ -434,33 +464,6 @@ class SessionManager:
         return result if result is not None else False
 
 
-    def _format_chunks(self, chunks: dict[int, dict[str, str | int]]) -> str | None:
-        if not chunks:
-            return None
-
-        sorted_chunks = dict(sorted(chunks.items(), key=lambda x: x[0]))
-        curr_paper_id = None
-        parts = []
-
-        for chunk_data in sorted_chunks.values():
-            paper_id = chunk_data["paper_id"]
-            chunk_index = chunk_data["chunk_index"]
-            markdown = chunk_data["text"]
-
-            if paper_id != curr_paper_id:
-                if curr_paper_id is not None:
-                    parts.append("</document>")
-                curr_paper_id = paper_id
-                parts.append(f"<document id='{paper_id}'>")
-
-            parts.append(f"<chunk id='{chunk_index}'>")
-            parts.append(markdown)
-            parts.append("</chunk>")
-
-        parts.append("</document>")
-        return "\n".join(parts)
-
-
     def _display_references(self, chunks: dict[int, dict[str, str | int]]):
         if not chunks:
             return
@@ -469,11 +472,110 @@ class SessionManager:
         for chunk in chunks.values():
             paper_ids.add(chunk["paper_id"])
 
-        paper_properties = self._db.get_papers_by_ids(list(paper_ids))
+        paper_properties = self._db.get_paper_metadata_by_id(list(paper_ids))
         if not paper_properties:
             return
 
         self._ui.display_references(paper_properties)
+
+
+    def _process_query_without_agent(self, user_input: str) -> None:
+        search_query = self._llm.rewrite_query(user_input)
+        self._ui.display_tool_args("search_for_chunks", {"query": search_query})
+        with self._ui.wait():
+            results = self._agent_tools.search_for_chunks(search_query)
+
+        self._ui.display_tool_output("search_for_chunks", results)
+        with self._ui.wait():
+            response = self._llm.query_chat(user_input, results["content"])
+
+        if response:
+            self._ui.stream_response(response)
+            self._display_references(results["raw_chunks"])
+
+
+    def _confirm_tool_use(self, tool_name: str, tool_args: dict) -> bool:
+        self._console.print(
+            f"\n🔐 [bold][yellow]Agent wants to use tool[/yellow] "
+            f"[cyan]{tool_name}[/cyan][/bold]"
+        )
+        self._console.print(
+            "[bold]Allow? [cyan]y[/cyan] = yes once, "
+            "[cyan]t[/cyan] = trust for session, "
+            "[cyan]n[/cyan] = no[/bold]"
+        )
+
+        choice = self._console.input("❓ [bold]Choice ([cyan]y/t/n[/cyan]): [/bold]").strip().lower()
+        if choice == "t":
+            self._trusted_tools.add(tool_name)
+            return True
+
+        if choice == "y":
+            return True
+
+        self._llm.add_function_call_history(tool_name, tool_args)
+        self._llm.add_function_response_history(
+            tool_name,
+            (
+                f"User denied permission to execute {tool_name} this time. "
+                "Respond without this tool if possible or try to use another tool. "
+                "Do not claim you are unable to help just because this tool was denied."
+            )
+        )
+        return False
+
+
+    def _process_query_with_agent(self, user_input: str) -> None:
+        self._llm.add_user_history(user_input)
+        retrieved_chunks = {}
+        agent_running = True
+
+        while agent_running:
+            with self._ui.wait():
+                response = self._llm.query_agent(self._api_tools)
+
+            if not response:
+                return
+
+            if response.function_calls:
+                call = response.function_calls[0]
+                tool_name = call.name
+                tool_args = dict(call.args)
+                if tool_name not in self._tool_functions:
+                    self._llm.add_function_call_history(tool_name, tool_args)
+                    self._llm.add_function_response_history(
+                        tool_name,
+                        f"Tool '{tool_name}' is not available."
+                    )
+                    continue
+
+                self._ui.display_tool_args(tool_name, tool_args)
+                if tool_name not in self._trusted_tools:
+                    proceed = self._confirm_tool_use(tool_name, tool_args)
+                    if not proceed:
+                        continue
+
+                self._console.print(f"\n🤖 Agent executing: {tool_name}")
+                with self._ui.wait():
+                    results = self._tool_functions[tool_name](**tool_args)
+
+                llm_content = results["content"]
+                if "raw_chunks" in results:
+                    retrieved_chunks.update(results["raw_chunks"])
+
+                self._ui.display_tool_output(tool_name, results)
+                result_for_history = llm_content or "No results returned"
+                self._llm.add_function_call_history(tool_name, tool_args)
+                self._llm.add_function_response_history(tool_name, result_for_history)
+                continue
+
+            agent_running = False
+
+        response_text = response.text.strip()
+        if response_text:
+            self._llm.add_model_history(response_text)
+            self._ui.stream_response(response_text)
+            self._display_references(retrieved_chunks)
 
 
     def run(self) -> None:
@@ -489,17 +591,15 @@ class SessionManager:
                 done = self._process_cmd(user_input)
                 continue
 
-            with self._ui.wait():
-                search_query = self._llm.rewrite_query(user_input)
-                embedding = self._chunker.embed_query(search_query)
-                chunks = self._db.top_chunk_matches(search_query, embedding)
-                best_chunks = self._reranker.rank_chunks(search_query, chunks)
-                formatted_chunks = self._format_chunks(best_chunks)
-                response = self._llm.query_chat(user_input, formatted_chunks)
+            if self._agent_mode_enabled:
+                self._process_query_with_agent(user_input)
+                continue
 
-            if response is not None:
-                self._ui.stream_response(response)
-                self._display_references(best_chunks)
+            self._process_query_without_agent(user_input)
+
+
+
+
 
 
 

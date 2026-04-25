@@ -6,6 +6,7 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich import box
 from rich.spinner import Spinner
+from rich.syntax import Syntax
 
 import math
 import time
@@ -28,6 +29,70 @@ class AxonUI:
         self._kb = KeyBindings()
         self._bind_keys()
         self._display_welcome()
+        self._init_renderers()
+
+
+    def _init_renderers(self) -> None:
+        self._tool_renderers = {
+            "search_for_chunks": self._render_rag_search,
+            "edit_file": self._render_diff,
+            "run_bash": self._render_bash
+        }
+
+        self._arg_renderers = {
+            "search_for_chunks": self._render_args_rag,
+            "edit_file": self._render_args_edit,
+            "run_bash": self._render_args_bash
+        }
+
+
+    def _render_diff(self, results: dict) -> None:
+        pass
+
+
+    def _render_bash(self, results: dict) -> None:
+        pass
+
+
+    def _render_rag_search(self,  results: dict) -> None:
+        result_text = results["content"]
+        if not result_text:
+            self._console.print(Panel("No relevant chunks found in the database.", title="📄 RAG Search Results"))
+            return
+
+        chunk_count = results.get("chunk_count", 0)
+        doc_count = results.get("doc_count", 0)
+
+        summary = (
+            f"🔍 Successfully extracted [bold cyan]{chunk_count}[/bold cyan] semantic chunks "
+            f"across [bold cyan]{doc_count}[/bold cyan] relevant document(s)."
+        )
+        self._console.print(Panel(summary, title="📄 RAG Search Results"))
+
+
+    def display_tool_output(self, tool_name: str, results: dict) -> None:
+        renderer = self._tool_renderers[tool_name]
+        self._console.print()
+        renderer(results)
+
+
+    def _render_args_bash(self, args: dict) -> None:
+        pass
+
+
+    def _render_args_edit(self, args: dict) -> None:
+        pass
+
+
+    def _render_args_rag(self, args: dict) -> None:
+        query = args.get("query", "")
+        self._console.print(f"[bold]🧠 Axon is searching memory for: [cyan]\"{query}\"[/cyan][/bold]")
+
+
+    def display_tool_args(self, tool_name: str, args: dict) -> None:
+        renderer = self._arg_renderers[tool_name]
+        self._console.print()
+        renderer(args)
 
 
     def _display_welcome(self) -> None:
