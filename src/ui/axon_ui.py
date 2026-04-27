@@ -37,20 +37,20 @@ class AxonUI:
     def _init_renderers(self) -> None:
         self._tool_renderers = {
             "search_for_chunks": self._render_rag_search,
-            "edit_file": self._render_edit_file,
+            "replace_in_file": self._render_replace_in_file,
             "execute_bash_cmd": self._render_bash,
             "create_file": self._render_create_file
         }
 
         self._arg_renderers = {
             "search_for_chunks": self._render_args_rag,
-            "edit_file": self._render_args_edit,
+            "replace_in_file": self._render_args_replace_in_file,
             "execute_bash_cmd": self._render_args_bash,
             "create_file": self._render_args_create_file
         }
 
 
-    def _render_edit_file(self, results: dict) -> None:
+    def _render_replace_in_file(self, results: dict) -> None:
         output = results["content"]
         diff = results.get("diff", None)
 
@@ -100,7 +100,7 @@ class AxonUI:
         self._console.print(Panel(syntax, title="⚡ Axon is Running"))
 
 
-    def _render_args_edit(self, args: dict) -> None:
+    def _render_args_replace_in_file(self, args: dict) -> None:
         filepath = args.get("path", "Unknown path")
         old_str = args.get("old_str", "")
         new_str = args.get("new_str", "")

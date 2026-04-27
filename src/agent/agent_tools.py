@@ -128,7 +128,7 @@ class AgentTools:
         try:
             filepath = Path(path.strip()).expanduser().resolve()
             if filepath.exists():
-                return {"content": f"# File already exists: {filepath}\nUse edit_file to modify existing files."}
+                return {"content": f"# File already exists: {filepath}\nUse replace_in_file to modify existing files."}
 
             filepath.parent.mkdir(parents=True, exist_ok=True)
             filepath.write_text(content, encoding="utf-8")
@@ -138,11 +138,19 @@ class AgentTools:
             return {"content": str(e)}
 
 
-    def edit_file(self, path: str, old_str: str, new_str: str) -> dict:
+    def replace_in_file(self, path: str, old_str: str, new_str: str) -> dict:
         try:
             filepath = Path(path.strip()).expanduser().resolve()
             if not filepath.exists():
                 return {"content": f"Error: The file \"{filepath}\" does not exist."}
+
+            if old_str == new_str:
+                return {
+                    "content": (
+                        f"Error: Could not edit \"{filepath}\" because old_str and new_str are identical.\n"
+                        "The file was not modified."
+                    )
+                }
 
             file_content = filepath.read_text(encoding="utf-8")
             match_count = file_content.count(old_str)

@@ -394,7 +394,8 @@ CHAT_LIMITS = [
     {"id": 20000, "label": "20,000 (short)"},
     {"id": 50000, "label": "50,000 (medium)"},
     {"id": 100000, "label": "100,000 (large)"},
-    {"id": 200000, "label": "200,000 (max)"},
+    {"id": 200000, "label": "200,000 (huge)"},
+    {"id": 750000, "label": "750,000 (max)"}
 ]
 
 
@@ -462,7 +463,7 @@ CREATE_FILE = {
     "name": "create_file",
     "description": (
         "Create a new file at the given path with the provided contents. "
-        "Use this only for new files; use edit_file to modify existing files."
+        "Use this only for new files; use replace_in_file to modify existing files."
     ),
     "parameters": {
         "type": "object",
@@ -482,11 +483,13 @@ CREATE_FILE = {
         "required": ["path", "content"]
     }
 }
-EDIT_FILE = {
-    "name": "edit_file",
+REPLACE_IN_FILE = {
+    "name": "replace_in_file",
     "description": (
         "Edit an existing file by replacing one exact text section with new text. "
-        "Use this only for modifying existing files; use create_file for new files."
+        "Use this only for modifying existing files; use create_file for new files. "
+        "When editing code, prefer replacing a complete syntactic block, such as "
+        "an entire function, loop, or if/else block, rather than a tiny prefix that may leave overlapping code behind."
     ),
     "parameters": {
         "type": "object",

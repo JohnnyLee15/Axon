@@ -40,14 +40,14 @@ class SessionManager:
             "search_for_chunks": self._agent_tools.search_for_chunks,
             "execute_bash_cmd": self._agent_tools.execute_bash_cmd,
             "create_file": self._agent_tools.create_file,
-            "edit_file": self._agent_tools.edit_file
+            "replace_in_file": self._agent_tools.replace_in_file
         }
         self._api_tools = [{
             "function_declarations": [
                 SEARCH_FOR_CHUNKS,
                 EXECUTE_BASH_CMD,
                 CREATE_FILE,
-                EDIT_FILE
+                REPLACE_IN_FILE
             ]
         }]
 
