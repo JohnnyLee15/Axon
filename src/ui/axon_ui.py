@@ -10,6 +10,7 @@ from rich.syntax import Syntax
 
 import math
 import time
+from pathlib import Path
 
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
@@ -19,6 +20,7 @@ from pylatexenc.latex2text import LatexNodes2Text
 
 from src.utils.config import *
 from src.ui.select_menu import SelectMenu
+from src.utils.file_utils import get_path_relative_to_project_root
 
 class AxonUI:
     def __init__(self, console: Console):
@@ -35,23 +37,39 @@ class AxonUI:
     def _init_renderers(self) -> None:
         self._tool_renderers = {
             "search_for_chunks": self._render_rag_search,
-            "edit_file": self._render_diff,
-            "run_bash": self._render_bash
+            "edit_file": self._render_edit_file,
+            "execute_bash_cmd": self._render_bash,
+            "create_file": self._render_create_file
         }
 
         self._arg_renderers = {
             "search_for_chunks": self._render_args_rag,
             "edit_file": self._render_args_edit,
-            "run_bash": self._render_args_bash
+            "execute_bash_cmd": self._render_args_bash,
+            "create_file": self._render_args_create_file
         }
 
 
-    def _render_diff(self, results: dict) -> None:
-        pass
+    def _render_edit_file(self, results: dict) -> None:
+        output = results["content"]
+        diff = results.get("diff", None)
+
+        if diff:
+            syntax = Syntax(diff, "diff", theme="monokai", word_wrap=True)
+            self._console.print(Panel(syntax, title="✨ File Edits"))
+        else:
+            self._console.print(Panel(output, title="⚠️ Edit Status"))
 
 
     def _render_bash(self, results: dict) -> None:
-        pass
+        output = results["content"]
+        syntax = Syntax(output, "bash", theme="monokai", word_wrap=True)
+        self._console.print(Panel(syntax, title="💻 Terminal Output"))
+
+
+    def _render_create_file(self, results: dict) -> None:
+        output = results["content"]
+        self._console.print(Panel(output, title="📝 File Status"))
 
 
     def _render_rag_search(self,  results: dict) -> None:
@@ -77,11 +95,43 @@ class AxonUI:
 
 
     def _render_args_bash(self, args: dict) -> None:
-        pass
+        cmd = args.get("cmd", "")
+        syntax = Syntax(cmd, "bash", theme="monokai", word_wrap=True)
+        self._console.print(Panel(syntax, title="⚡ Axon is Running"))
 
 
     def _render_args_edit(self, args: dict) -> None:
-        pass
+        filepath = args.get("path", "Unknown path")
+        old_str = args.get("old_str", "")
+        new_str = args.get("new_str", "")
+
+        display_path = get_path_relative_to_project_root(filepath)
+        display_str = str(display_path) if display_path else filepath
+        ext = display_str.split(".")[-1] if "." in display_str else "text"
+
+        search_syntax = Syntax(old_str, ext, theme="monokai", word_wrap=True)
+        replace_syntax = Syntax(new_str, ext, theme="monokai", word_wrap=True)
+
+        group = Group(
+            Text("🔍 Replacing this exact block:"),
+            search_syntax,
+            Text("\n✨ With this new block:"),
+            replace_syntax
+        )
+
+        self._console.print(Panel(group, title=f"⚡ Intended Edit: [cyan]{display_str}[/cyan]", border_style="yellow"))
+
+
+    def _render_args_create_file(self, args: dict) -> None:
+        filepath = args.get("path", "Unknown file")
+        content = args.get("content", "")
+
+        display_path = get_path_relative_to_project_root(filepath)
+        display_str = str(display_path) if display_path else filepath
+        ext = display_str.split(".")[-1] if "." in display_str else "text"
+
+        syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
+        self._console.print(Panel(syntax, title=f"📋 Creating File: [cyan]{display_str}[/cyan]"))
 
 
     def _render_args_rag(self, args: dict) -> None:

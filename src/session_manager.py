@@ -37,11 +37,17 @@ class SessionManager:
         self._trusted_tools = set()
         self._agent_tools = AgentTools(self._chunker, self._db, self._reranker)
         self._tool_functions = {
-            "search_for_chunks": self._agent_tools.search_for_chunks
+            "search_for_chunks": self._agent_tools.search_for_chunks,
+            "execute_bash_cmd": self._agent_tools.execute_bash_cmd,
+            "create_file": self._agent_tools.create_file,
+            "edit_file": self._agent_tools.edit_file
         }
         self._api_tools = [{
             "function_declarations": [
-                SEARCH_FOR_CHUNKS
+                SEARCH_FOR_CHUNKS,
+                EXECUTE_BASH_CMD,
+                CREATE_FILE,
+                EDIT_FILE
             ]
         }]
 
@@ -571,11 +577,13 @@ class SessionManager:
 
             agent_running = False
 
-        response_text = response.text.strip()
+        response_text = (response.text or "").strip()
         if response_text:
             self._llm.add_model_history(response_text)
             self._ui.stream_response(response_text)
             self._display_references(retrieved_chunks)
+        else:
+            self._console.print("\n[bold dim] Agent completed with no final text response.[/bold dim]")
 
 
     def run(self) -> None:
@@ -596,9 +604,6 @@ class SessionManager:
                 continue
 
             self._process_query_without_agent(user_input)
-
-
-
 
 
 

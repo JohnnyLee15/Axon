@@ -247,8 +247,16 @@ Tool Use:
 - Prefer the least invasive tool that can accomplish the task.
 - Before taking an action that modifies files, executes commands, or changes state, consider whether the action is necessary and aligned with the user's request.
 - If tool results are useful, incorporate them naturally into your answer.
-- If tool results are incomplete, empty, irrelevant, or erroring, continue with best-effort reasoning when appropriate and be honest about the limitation.
+- If tool results are incomplete, empty, irrelevant, or erroring, recover when reasonable; otherwise continue with best-effort reasoning and be honest about the limitation.
 - Do not mention internal tool names, raw tool payloads, hidden formatting, or implementation details unless the user explicitly asks.
+
+Tool Recovery:
+- Treat tool failures, empty outputs, and unexpected results as diagnostic information, not final answers by themselves.
+- When a tool result does not resolve the task, make a reasonable next attempt if there is a safe, obvious way to refine, broaden, or verify the action.
+- For inspection tasks, gather enough context to avoid shallow conclusions.
+- Prefer small, targeted follow-up actions over broad or risky ones.
+- Do not repeatedly retry the same failed action without changing the approach.
+- Ask the user only when the next step is ambiguous, risky, or requires information you cannot reasonably infer.
 
 Grounding:
 - You may receive information from retrieved excerpts, files, command output, generated analysis, or other tool results.
@@ -431,5 +439,77 @@ SEARCH_FOR_CHUNKS = {
             }
         },
         "required": ["query"]
+    }
+}
+EXECUTE_BASH_CMD = {
+    "name": "execute_bash_cmd",
+    "description": (
+        "Execute a bash command exactly as it should be typed in a terminal. "
+        "Do not add backslashes before ordinary single or double quotes unless the shell command itself requires them."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "cmd": {
+                "type": "string",
+                "description": "The exact bash command to execute as a raw, unescaped bash string."
+            }
+        },
+        "required": ["cmd"]
+    }
+}
+CREATE_FILE = {
+    "name": "create_file",
+    "description": (
+        "Create a new file at the given path with the provided contents. "
+        "Use this only for new files; use edit_file to modify existing files."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path where the new file should be created."
+            },
+            "content": {
+                "type": "string",
+                "description": (
+                    "The exact full contents to write into the new file. "
+                    "Do not wrap the contents in markdown fences."
+                )
+            }
+        },
+        "required": ["path", "content"]
+    }
+}
+EDIT_FILE = {
+    "name": "edit_file",
+    "description": (
+        "Edit an existing file by replacing one exact text section with new text. "
+        "Use this only for modifying existing files; use create_file for new files."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path of the file to edit."
+            },
+            "old_str": {
+                "type": "string",
+                "description": (
+                    "The exact text currently in the file to replace. "
+                    "It must match exactly, including whitespace and indentation, and appear only once."
+                )
+            },
+            "new_str": {
+                "type": "string",
+                "description": (
+                    "The exact replacement text. "
+                    "Do not wrap the contents in markdown fences."
+                )
+            }
+        },
+        "required": ["path", "old_str", "new_str"]
     }
 }
