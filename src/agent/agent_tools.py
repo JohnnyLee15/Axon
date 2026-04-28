@@ -194,3 +194,134 @@ class AgentTools:
             return {"content": str(e)}
 
 
+    def read_file(
+        self,
+        path: str,
+        start_line: int | None = None,
+        end_line: int | None = None
+    ) -> dict:
+        try:
+            filepath = Path(path).expanduser().resolve()
+            if not filepath.exists():
+                return {"content": f"Error: The file \"{filepath}\" does not exist."}
+
+            if filepath.is_dir():
+                return {
+                    "content": (
+                        f"Error: \"{filepath}\" is a directory, not a file. "
+                        f"Use execute_bash_cmd with \"ls -la {filepath}\" to see its contents."
+                    )
+                }
+
+            file_contents = filepath.read_text(encoding="utf-8")
+            lines = file_contents.splitlines()
+            num_lines = len(lines)
+
+            if start_line is None:
+                start_line = 1
+
+            if end_line is None:
+                end_line = num_lines
+
+            if num_lines == 0:
+                return {"content": f"File \"{filepath}\" is empty.", "start_line": 1, "end_line": 0}
+
+            if start_line < 1 or end_line < 1:
+                return {"content": "Error: start_line and end_line must be 1-indexed line numbers. The first line is line 1."}
+
+            if start_line > end_line:
+                return {"content": f"Error: start_line={start_line} > end_line={end_line}. Try again and ensure start_line <= end_line."}
+
+            if start_line > num_lines:
+                return {
+                    "content": (
+                        f"Error: Cannot read from line {start_line} in \"{filepath}\" because "
+                        f"the file only has {num_lines} lines."
+                    )
+                }
+
+            end_line = min(end_line, num_lines)
+            selected_lines = lines[start_line-1:end_line]
+            line_num_spaces = len(str(end_line))
+            llm_content = ""
+            for i, line in enumerate(selected_lines, start=start_line):
+                llm_content += f"{i:{line_num_spaces}} | {line}\n"
+
+            return {"content": llm_content, "start_line": start_line, "end_line": end_line}
+
+        except Exception as e:
+            return {"content": str(e)}
+
+
+    def insert_to_file(
+        self,
+        path: str,
+        insert_text: str,
+        insert_after_line: int | None = None
+    ) -> dict:
+        try:
+            filepath = Path(path).expanduser().resolve()
+            if not filepath.exists():
+                return {"content": f"Error: The file \"{filepath}\" does not exist."}
+
+            if not filepath.is_file():
+                return {
+                    "content": f"Error: Cannot insert into \"{filepath}\" because it is not a regular file."
+                }
+
+            if not insert_text:
+                return {
+                    "content": "Error: insert_text was not provided. Try again and provide non-empty insert_text."
+                }
+
+
+            file_contents = filepath.read_text(encoding="utf-8")
+            lines = file_contents.splitlines(keepends=True)
+            num_lines = len(lines)
+
+            if insert_after_line is None:
+                insert_after_line = num_lines
+
+            if insert_after_line < 0:
+                return {"content": (
+                        "Error: insert_after_line must be a non-negative integer. "
+                        "To insert at the beginning of the file use insert_after_line=0."
+                    )
+                }
+
+            if insert_after_line > num_lines:
+                return {
+                    "content": (
+                        f"Error: Cannot insert content after line {insert_after_line} in \"{filepath}\" because "
+                        f"the file only has {num_lines} lines."
+                    )
+                }
+
+            if not insert_text.endswith('\n'):
+                insert_text += '\n'
+
+            if insert_after_line == num_lines and num_lines > 0:
+                if not lines[-1].endswith("\n"):
+                    lines[-1] += "\n"
+
+            lines.insert(insert_after_line, insert_text)
+            new_content = "".join(lines)
+            filepath.write_text(new_content, encoding="utf-8")
+
+            display_path = get_path_relative_to_project_root(filepath)
+            diff = difflib.unified_diff(
+                file_contents.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile=f"a/{display_path}",
+                tofile=f"b/{display_path}",
+                n=3
+            )
+            diff_text = "".join(diff)
+
+            return {
+                "content": f"# Successfully inserted into {filepath}\n\n```diff\n{diff_text}\n```",
+                "diff": diff_text
+            }
+
+        except Exception as e:
+            return {"content": str(e)}

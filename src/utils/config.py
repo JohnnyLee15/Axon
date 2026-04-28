@@ -516,3 +516,28 @@ REPLACE_IN_FILE = {
         "required": ["path", "old_str", "new_str"]
     }
 }
+READ_FILE = {
+    "name": "read_file",
+    "description": (
+        "Read the contents of a file. Returns the text with line numbers to help you navigate. "
+        "You can optionally provide start_line and end_line to read a specific section of a file."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path of the file to read."
+            },
+            "start_line": {
+                "type": "integer",
+                "description": "Optional 1-indexed first line to read, inclusive. Defaults to 1."
+            },
+            "end_line": {
+                "type": "integer",
+                "description": "Optional 1-indexed last line to read, inclusive. Defaults to the end of the file."
+            }
+        },
+        "required": ["path"]
+    }
+}

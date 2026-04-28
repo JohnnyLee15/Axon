@@ -39,14 +39,16 @@ class AxonUI:
             "search_for_chunks": self._render_rag_search,
             "replace_in_file": self._render_replace_in_file,
             "execute_bash_cmd": self._render_bash,
-            "create_file": self._render_create_file
+            "create_file": self._render_create_file,
+            "read_file": self._render_read_file
         }
 
         self._arg_renderers = {
             "search_for_chunks": self._render_args_rag,
             "replace_in_file": self._render_args_replace_in_file,
             "execute_bash_cmd": self._render_args_bash,
-            "create_file": self._render_args_create_file
+            "create_file": self._render_args_create_file,
+            "read_file": self._render_args_read_file
         }
 
 
@@ -56,26 +58,26 @@ class AxonUI:
 
         if diff:
             syntax = Syntax(diff, "diff", theme="monokai", word_wrap=True)
-            self._console.print(Panel(syntax, title="✨ File Edits"))
+            self._console.print(Panel(syntax, title="[bold]✨ File Edits[/bold]"))
         else:
-            self._console.print(Panel(output, title="⚠️ Edit Status"))
+            self._console.print(Panel(output, title="[bold]⚠️ Edit Status[/bold]"))
 
 
     def _render_bash(self, results: dict) -> None:
         output = results["content"]
         syntax = Syntax(output, "bash", theme="monokai", word_wrap=True)
-        self._console.print(Panel(syntax, title="💻 Terminal Output"))
+        self._console.print(Panel(syntax, title="[bold]💻 Terminal Output[/bold]"))
 
 
     def _render_create_file(self, results: dict) -> None:
         output = results["content"]
-        self._console.print(Panel(output, title="📝 File Status"))
+        self._console.print(Panel(output, title="[bold]📝 File Status[/bold]"))
 
 
     def _render_rag_search(self,  results: dict) -> None:
         result_text = results["content"]
         if not result_text:
-            self._console.print(Panel("No relevant chunks found in the database.", title="📄 RAG Search Results"))
+            self._console.print(Panel("No relevant chunks found in the database.", title="[bold]📄 RAG Search Results[/bold]"))
             return
 
         chunk_count = results.get("chunk_count", 0)
@@ -85,7 +87,21 @@ class AxonUI:
             f"🔍 Successfully extracted [bold cyan]{chunk_count}[/bold cyan] semantic chunks "
             f"across [bold cyan]{doc_count}[/bold cyan] relevant document(s)."
         )
-        self._console.print(Panel(summary, title="📄 RAG Search Results"))
+        self._console.print(Panel(summary, title="[bold]📄 RAG Search Results[/bold]"))
+
+
+    def _render_read_file(self, results: dict) -> None:
+        start_line = results.get("start_line", None)
+        end_line = results.get("end_line", None)
+
+        if start_line is None or end_line is None:
+            self._console.print(Panel(results["content"], title="[bold]⚠️ Error Reading File[/bold]"))
+            return
+
+        self._console.print(Panel(
+            f"✅ Successfully read lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan] into memory.",
+            title="[bold]📄 File Read[/bold]"
+        ))
 
 
     def display_tool_output(self, tool_name: str, results: dict) -> None:
@@ -97,7 +113,7 @@ class AxonUI:
     def _render_args_bash(self, args: dict) -> None:
         cmd = args.get("cmd", "")
         syntax = Syntax(cmd, "bash", theme="monokai", word_wrap=True)
-        self._console.print(Panel(syntax, title="⚡ Axon is Running"))
+        self._console.print(Panel(syntax, title="[bold]⚡ Axon is Running[/bold]"))
 
 
     def _render_args_replace_in_file(self, args: dict) -> None:
@@ -119,7 +135,7 @@ class AxonUI:
             replace_syntax
         )
 
-        self._console.print(Panel(group, title=f"⚡ Intended Edit: [cyan]{display_str}[/cyan]", border_style="yellow"))
+        self._console.print(Panel(group, title=f"[bold]⚡ Intended Edit: [cyan]{display_str}[/cyan][/bold]"))
 
 
     def _render_args_create_file(self, args: dict) -> None:
@@ -131,12 +147,26 @@ class AxonUI:
         ext = display_str.split(".")[-1] if "." in display_str else "text"
 
         syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
-        self._console.print(Panel(syntax, title=f"📋 Creating File: [cyan]{display_str}[/cyan]"))
+        self._console.print(Panel(syntax, title=f"[bold]📋 Creating File: [cyan]{display_str}[/cyan][/bold]"))
 
 
     def _render_args_rag(self, args: dict) -> None:
         query = args.get("query", "")
         self._console.print(f"[bold]🧠 Axon is searching memory for: [cyan]\"{query}\"[/cyan][/bold]")
+
+
+    def _render_args_read_file(self, args: dict) -> None:
+        filepath = args.get("path", "")
+        start_line = args.get("start_line", 1)
+        end_line = args.get("end_line", "EOF")
+
+        display_path = get_path_relative_to_project_root(filepath)
+        display_str = str(display_path) if display_path else filepath
+
+        self._console.print(Panel(
+            f"Scanning lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan]",
+            title=f"[bold]📖 Inspecting File: [cyan]{display_str}[/cyan][/bold]",
+        ))
 
 
     def display_tool_args(self, tool_name: str, args: dict) -> None:
