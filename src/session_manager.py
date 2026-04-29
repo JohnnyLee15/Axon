@@ -568,7 +568,7 @@ class SessionManager:
                     results = self._tool_functions[tool_name](**tool_args)
 
                 llm_content = results["content"]
-                if "raw_chunks" in results:
+                if results.get("raw_chunks"):
                     retrieved_chunks.update(results["raw_chunks"])
 
                 self._ui.display_tool_output(tool_name, results)
