@@ -398,6 +398,10 @@ CHAT_LIMITS = [
     {"id": 750000, "label": "750,000 (max)"}
 ]
 
+# ------ API Constants ------
+API_BUSY_ERROR_CODES = ["503", "429"]
+MAX_RETRIES = 3
+
 
 # ------ UI Constants ------
 LOGO = """

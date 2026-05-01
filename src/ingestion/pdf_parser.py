@@ -15,6 +15,7 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOp
 from src.utils.config import *
 from src.utils.device_utils import get_docling_device
 from src.trackers.document_state import DocumentState, ParsedDoc
+from src.utils.api_utils import execute_with_retries
 
 from rich.console import Console
 from pathlib import Path
@@ -111,7 +112,10 @@ class PdfParser:
                 self._console.print("[bold]🤖 Triggering LLM Title Extractor Fallback[/bold]")
                 prompt = f"<first_page_text>\n{parsed_doc.page_one}\n</first_page_text>"
 
-                response = self._client.models.generate_content(
+                response = execute_with_retries(
+                    api_func=self._client.models.generate_content,
+                    console=self._console,
+                    num_retries=MAX_RETRIES,
                     model=self._model,
                     contents=prompt,
                     config={
@@ -233,7 +237,10 @@ class PdfParser:
 
         try:
             self._console.print("[bold]🤖 Triggering LLM Curation[/bold]")
-            response = self._client.models.generate_content(
+            response = execute_with_retries(
+                api_func=self._client.models.generate_content,
+                console=self._console,
+                num_retries=MAX_RETRIES,
                 model=self._model,
                 contents=formatted_prompt,
                 config={

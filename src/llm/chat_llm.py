@@ -1,4 +1,5 @@
 from src.utils.config import *
+from src.utils.api_utils import execute_with_retries
 
 import os
 from google import genai
@@ -62,7 +63,13 @@ class ChatLLM:
                 "role": "user",
                 "parts": [{"text": f"SYSTEM_INSTRUCTION:\n{AXON_SYSTEM_PROMPT}"}]
             }] + history
-            response = self._client.models.count_tokens(model=self._chat_model, contents=contents,)
+            response = execute_with_retries(
+                api_func=self._client.models.count_tokens,
+                console=self._console,
+                num_retries=MAX_RETRIES,
+                model=self._chat_model,
+                contents=contents,
+            )
             return response.total_tokens
 
         except Exception as e:
@@ -102,7 +109,10 @@ class ChatLLM:
         )
 
         try:
-            response = self._client.models.generate_content(
+            response = execute_with_retries(
+                api_func=self._client.models.generate_content,
+                console=self._console,
+                num_retries=MAX_RETRIES,
                 model=self._rewrite_model,
                 contents=user_content,
                 config={
@@ -209,7 +219,10 @@ class ChatLLM:
             return None
 
         try:
-            response = self._client.models.generate_content(
+            response = execute_with_retries(
+                api_func=self._client.models.generate_content,
+                console=self._console,
+                num_retries=MAX_RETRIES,
                 model=self._chat_model,
                 contents=payload,
                 config={
@@ -246,7 +259,10 @@ class ChatLLM:
             return None
 
         try:
-            response = self._client.models.generate_content(
+            response = execute_with_retries(
+                api_func=self._client.models.generate_content,
+                console=self._console,
+                num_retries=MAX_RETRIES,
                 model=self._chat_model,
                 contents=self._history,
                 config={
@@ -282,7 +298,10 @@ class ChatLLM:
         )
 
         try:
-            response = self._client.models.generate_content(
+            response = execute_with_retries(
+                api_func=self._client.models.generate_content,
+                console=self._console,
+                num_retries=MAX_RETRIES,
                 model=self._compact_model,
                 contents = compact_content,
                 config={

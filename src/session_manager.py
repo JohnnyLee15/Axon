@@ -515,7 +515,8 @@ class SessionManager:
             "[cyan]n[/cyan] = no[/bold]"
         )
 
-        choice = self._console.input("❓ [bold]Choice ([cyan]y/t/n[/cyan]): [/bold]").strip().lower()
+        choice_raw = self._console.input("❓ [bold]Choice ([cyan]y/t/n[/cyan]): [/bold]").strip()
+        choice = choice_raw.lower()
         if choice == "t":
             self._trusted_tools.add(tool_name)
             return True
@@ -523,16 +524,26 @@ class SessionManager:
         if choice == "y":
             return True
 
+        if choice == "n":
+            self._llm.add_function_call_history(tool_name, tool_args)
+            self._llm.add_function_response_history(
+                tool_name,
+                (
+                    f"User denied permission to execute {tool_name} this time. "
+                    "Respond without this tool if possible or try to use another tool. "
+                    "Do not claim you are unable to help just because this tool was denied."
+                )
+            )
+            return False
+
         self._llm.add_function_call_history(tool_name, tool_args)
         self._llm.add_function_response_history(
             tool_name,
-            (
-                f"User denied permission to execute {tool_name} this time. "
-                "Respond without this tool if possible or try to use another tool. "
-                "Do not claim you are unable to help just because this tool was denied."
-            )
+            f"User interrupted execution of {tool_name} with a new message instead."
         )
+        self._llm.add_user_history(choice_raw)
         return False
+
 
 
     def _process_query_with_agent(self, user_input: str) -> None:
