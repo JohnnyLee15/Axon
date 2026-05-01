@@ -7,3 +7,4 @@ data/
 **/*.txt
 !requirements.txt
 **/*.zsh
+axon.pptx

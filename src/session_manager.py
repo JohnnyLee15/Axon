@@ -41,7 +41,8 @@ class SessionManager:
             "execute_bash_cmd": self._agent_tools.execute_bash_cmd,
             "create_file": self._agent_tools.create_file,
             "replace_in_file": self._agent_tools.replace_in_file,
-            "read_file": self._agent_tools.read_file
+            "read_file": self._agent_tools.read_file,
+            "insert_to_file": self._agent_tools.insert_to_file
         }
         self._api_tools = [{
             "function_declarations": [
@@ -49,7 +50,8 @@ class SessionManager:
                 EXECUTE_BASH_CMD,
                 CREATE_FILE,
                 REPLACE_IN_FILE,
-                READ_FILE
+                READ_FILE,
+                INSERT_TO_FILE
             ]
         }]
 

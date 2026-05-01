@@ -274,7 +274,6 @@ class AgentTools:
                     "content": "Error: insert_text was not provided. Try again and provide non-empty insert_text."
                 }
 
-
             file_contents = filepath.read_text(encoding="utf-8")
             lines = file_contents.splitlines(keepends=True)
             num_lines = len(lines)

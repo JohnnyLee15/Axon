@@ -541,3 +541,34 @@ READ_FILE = {
         "required": ["path"]
     }
 }
+INSERT_TO_FILE = {
+    "name": "insert_to_file",
+    "description": (
+        "Insert text into an existing file after a specific line number. "
+        "Use read_file first if you need to see line numbers. "
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path of the file to edit."
+            },
+            "insert_text": {
+                "type": "string",
+                "description": (
+                    "The exact text to insert. "
+                    "Do not wrap the contents in markdown fences."
+                )
+            },
+            "insert_after_line": {
+                "type": "integer",
+                "description": (
+                    "Optional 1-indexed line number to insert after. "
+                    "Use 0 to insert at the beginning. Defaults to the end of the file."
+                )
+            }
+        },
+        "required": ["path", "insert_text"]
+    }
+}

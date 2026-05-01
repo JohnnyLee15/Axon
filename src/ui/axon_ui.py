@@ -40,7 +40,8 @@ class AxonUI:
             "replace_in_file": self._render_replace_in_file,
             "execute_bash_cmd": self._render_bash,
             "create_file": self._render_create_file,
-            "read_file": self._render_read_file
+            "read_file": self._render_read_file,
+            "insert_to_file": self._render_insert_to_file
         }
 
         self._arg_renderers = {
@@ -48,7 +49,8 @@ class AxonUI:
             "replace_in_file": self._render_args_replace_in_file,
             "execute_bash_cmd": self._render_args_bash,
             "create_file": self._render_args_create_file,
-            "read_file": self._render_args_read_file
+            "read_file": self._render_args_read_file,
+            "insert_to_file": self._render_args_insert_to_file
         }
 
 
@@ -102,6 +104,17 @@ class AxonUI:
             f"✅ Successfully read lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan] into memory.",
             title="[bold]📄 File Read[/bold]"
         ))
+
+
+    def _render_insert_to_file(self, results: dict) -> None:
+        output = results["content"]
+        diff = results.get("diff", None)
+
+        if diff:
+            syntax = Syntax(diff, "diff", theme="monokai", word_wrap=True)
+            self._console.print(Panel(syntax, title="[bold]✨ File Edits[/bold]"))
+        else:
+            self._console.print(Panel(output, title="[bold]⚠️ Edit Status[/bold]"))
 
 
     def display_tool_output(self, tool_name: str, results: dict) -> None:
@@ -166,6 +179,22 @@ class AxonUI:
         self._console.print(Panel(
             f"Scanning lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan]",
             title=f"[bold]📖 Inspecting File: [cyan]{display_str}[/cyan][/bold]",
+        ))
+
+
+    def _render_args_insert_to_file(self, args: dict) -> None:
+        filepath = args.get("path", "Unknown file")
+        insert_text = args.get("insert_text", "")
+        insert_after_line = args.get("insert_after_line", None)
+
+        display_path = get_path_relative_to_project_root(filepath)
+        display_str = str(display_path) if display_path else filepath
+        ext = display_str.split(".")[-1] if "." in display_str else "text"
+
+        syntax = Syntax(insert_text, ext, theme="monokai", line_numbers=False, word_wrap=True)
+        self._console.print(Panel(
+            syntax,
+            title=f"[bold]📥 Inserting into [cyan]{display_str}[/cyan] after line [cyan]{insert_after_line}[/cyan][/bold]"
         ))
 
 
