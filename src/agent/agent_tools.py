@@ -77,7 +77,7 @@ class AgentTools:
 
             path = parts[1] if len(parts) == 2 else "~"
             os.chdir(os.path.expanduser(path))
-            f"# Directory changed to {os.getcwd()}"
+            return f"# Directory changed to {os.getcwd()}"
 
         except Exception as e:
             return str(e)
