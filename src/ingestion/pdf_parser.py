@@ -1,24 +1,21 @@
-import os
-import json
 import logging
+from pathlib import Path
 
 # Suppress logging
 logging.disable(logging.INFO)
 
-from google import genai
 from docling.datamodel.base_models import DocItemLabel
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
+from rich.console import Console
 
 from src.utils.config import *
 from src.utils.device_utils import get_docling_device
 from src.trackers.document_state import DocumentState, ParsedDoc
-from src.utils.api_utils import execute_with_retries
+from src.llm.llm_adapter import LLMAdapter
 
-from rich.console import Console
-from pathlib import Path
 
 class PdfParser:
     """
@@ -26,9 +23,10 @@ class PdfParser:
     rule-based and LLM filtering to remove academic noise.
     """
 
-    def __init__(self, console: Console) -> None:
+    def __init__(self, console: Console, llm_adapter: LLMAdapter) -> None:
         self._model = LLM_CURATION_MODEL
-        self._client = genai.Client(api_key=os.environ.get(GEM_API_KEY))
+        self._console = console
+        self._llm_adapter = llm_adapter
 
         pipeline_opts = PdfPipelineOptions(
             do_ocr=False,
@@ -43,7 +41,6 @@ class PdfParser:
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
             }
         )
-        self._console = console
 
 
     def __call__(self, filepath: Path) -> ParsedDoc:
@@ -112,22 +109,15 @@ class PdfParser:
                 self._console.print("[bold]🤖 Triggering LLM Title Extractor Fallback[/bold]")
                 prompt = f"<first_page_text>\n{parsed_doc.page_one}\n</first_page_text>"
 
-                response = execute_with_retries(
-                    api_func=self._client.models.generate_content,
-                    console=self._console,
-                    num_retries=MAX_RETRIES,
+                parsed_args = self._llm_adapter.generate_json(
                     model=self._model,
-                    contents=prompt,
-                    config={
-                        "system_instruction": TITLE_PROMPT,
-                        "temperature": LLM_METADATA_MODEL_TEMPERATURE,
-                        "response_mime_type": "application/json",
-                        "response_schema": TITLE_SCHEMA
-                    }
+                    contents=self._llm_adapter.text_message(prompt),
+                    system_instruction=TITLE_PROMPT,
+                    schema=TITLE_SCHEMA,
+                    temperature=LLM_METADATA_MODEL_TEMPERATURE,
                 )
 
                 self._console.print("[bold]✅ LLM Title Extractor responded successfully with tool arguments[/bold]")
-                parsed_args = json.loads(response.text)
 
                 llm_title = parsed_args.get("title")
                 if isinstance(llm_title, str):
@@ -237,22 +227,16 @@ class PdfParser:
 
         try:
             self._console.print("[bold]🤖 Triggering LLM Curation[/bold]")
-            response = execute_with_retries(
-                api_func=self._client.models.generate_content,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+
+            parsed_args = self._llm_adapter.generate_json(
                 model=self._model,
-                contents=formatted_prompt,
-                config={
-                    "system_instruction": LLM_CURATION_PROMPT,
-                    "temperature": LLM_CURATION_MODEL_TEMPERATURE,
-                    "response_mime_type": "application/json",
-                    "response_schema": CURATION_TOOL
-                }
+                contents=self._llm_adapter.text_message(formatted_prompt),
+                system_instruction=LLM_CURATION_PROMPT,
+                schema=CURATION_TOOL,
+                temperature=LLM_CURATION_MODEL_TEMPERATURE,
             )
 
             self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments[/bold]")
-            parsed_args = json.loads(response.text)
             return parsed_args.get("noise_block_ids", [])
 
         except Exception as e:
@@ -267,18 +251,15 @@ class PdfParser:
 
         current_batch_text = ""
         bids_to_remove = []
-        current_batch_count = 0
         for bid in noise_risk_bids:
             block_text = blocks_reg[bid].markdown
             entry = f"<block id='{bid}'>\n{block_text}\n</block>\n"
 
-            if len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
+            if current_batch_text and len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
                 bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
                 current_batch_text = ""
-                current_batch_count = 0
 
             current_batch_text += entry
-            current_batch_count += 1
 
         # Catch the final, partially-filled batch
         if current_batch_text:

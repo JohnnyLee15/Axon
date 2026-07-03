@@ -10,6 +10,7 @@ from src.retrieval.mlx_chunk_reranker import MLXChunkReranker
 from src.retrieval.torch_chunk_reranker import TorchChunkReranker
 from src.utils.device_utils import get_torch_device
 from src.agent.agent_tools import AgentTools
+from src.llm.gemini_adapter import GeminiAdapter
 
 from rich.console import Console
 from typing import Any
@@ -21,11 +22,12 @@ from pathlib import Path
 class SessionManager:
     def __init__(self):
         self._console = Console()
-        self._parser = PdfParser(self._console)
+        self._llm_adapter = GeminiAdapter(self._console)
+        self._parser = PdfParser(self._console, self._llm_adapter)
         self._chunker = SemanticChunker(self._console)
         self._db = VectorDatabase(self._console)
         self._ui = AxonUI(self._console)
-        self._llm = ChatLLM(self._console)
+        self._llm = ChatLLM(self._console, self._llm_adapter)
         self._minhasher = MinHasher()
         self._agent_mode_enabled = False
         self._init_reranker()
@@ -558,10 +560,12 @@ class SessionManager:
             if not response:
                 return
 
-            if response.function_calls:
-                call = response.function_calls[0]
-                tool_name = call.name
-                tool_args = dict(call.args)
+            tool_calls = response["tool_calls"]
+            if tool_calls:
+                call = tool_calls[0]
+                tool_name = call["name"]
+                tool_args = call["args"]
+
                 if tool_name not in self._tool_functions:
                     self._llm.add_function_call_history(tool_name, tool_args)
                     self._llm.add_function_response_history(
@@ -592,13 +596,13 @@ class SessionManager:
 
             agent_running = False
 
-        response_text = (response.text or "").strip()
+        response_text = response["text"]
         if response_text:
             self._llm.add_model_history(response_text)
             self._ui.stream_response(response_text)
             self._display_references(retrieved_chunks)
         else:
-            self._console.print("\n[bold dim] Agent completed with no final text response.[/bold dim]")
+            self._console.print("\n✅ [bold]Agent task completed.[/bold]")
 
 
     def run(self) -> None:

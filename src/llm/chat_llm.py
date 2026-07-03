@@ -1,22 +1,21 @@
-from src.utils.config import *
-from src.utils.api_utils import execute_with_retries
-
-import os
-from google import genai
-from rich.console import Console
-
 from typing import Any
 
+from rich.console import Console
+
+from src.utils.config import *
+from src.llm.llm_adapter import LLMAdapter
+
+
 class ChatLLM:
-    def __init__(self, console: Console):
+    def __init__(self, console: Console, llm_adapter: LLMAdapter):
         self._chat_model = LLM_CHAT_MODEL_DEFAULT
         self._context_size = LLM_CONTEXT_SIZE_DEFAULT
         self._rewrite_model = LLM_REWRITE_MODEL
         self._compact_model = LLM_COMPACT_MODEL
         self._console = console
+        self._llm_adapter = llm_adapter
         self._auto_compact_enabled = False
         self._chat_roll_enabled = False
-        self._client = genai.Client(api_key=os.getenv("GEM_API_KEY"))
         self._history = []
 
 
@@ -36,11 +35,11 @@ class ChatLLM:
         self._history = []
 
 
-    def get_history(self) -> list[dict[str, str]]:
+    def get_history(self) -> list[dict[str, Any]]:
         return self._history
 
 
-    def set_history(self, history: list[dict[str, str]]) -> None:
+    def set_history(self, history: list[dict[str, Any]]) -> None:
         self._history = history
 
 
@@ -54,23 +53,16 @@ class ChatLLM:
         return self._chat_roll_enabled
 
 
-    def get_token_count(self, history: list[dict[str, str]] | None = None) -> int:
+    def get_token_count(self, history: list[dict[str, Any]] | None = None) -> int:
         if history is None:
             history = self._history
 
         try:
-            contents = [{
-                "role": "user",
-                "parts": [{"text": f"SYSTEM_INSTRUCTION:\n{AXON_SYSTEM_PROMPT}"}]
-            }] + history
-            response = execute_with_retries(
-                api_func=self._client.models.count_tokens,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+            return self._llm_adapter.count_tokens(
                 model=self._chat_model,
-                contents=contents,
+                contents=history,
+                system_instruction=AXON_SYSTEM_PROMPT,
             )
-            return response.total_tokens
 
         except Exception as e:
             self._console.print(f"\n🪙 [bold red]Error calculating token count: {e}[/bold red]")
@@ -103,24 +95,18 @@ class ChatLLM:
             content = self._stringify_history_chat(role, msg["parts"][0])
             transcript += f"{content}\n"
 
-        user_content = (
+        user_contents = (
             f"<chat_history>\n{transcript.strip()}\n</chat_history>\n"
             f"<user_question>\n{query}\n</user_question>"
         )
 
         try:
-            response = execute_with_retries(
-                api_func=self._client.models.generate_content,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+            return self._llm_adapter.generate_text(
                 model=self._rewrite_model,
-                contents=user_content,
-                config={
-                    "system_instruction": REWRITE_SYSTEM_PROMPT,
-                    "temperature": LLM_REWRITE_TEMP
-                }
+                contents=self._llm_adapter.text_message(user_contents),
+                system_instruction=REWRITE_SYSTEM_PROMPT,
+                temperature=LLM_REWRITE_TEMP,
             )
-            return response.text.strip()
 
         except Exception:
             return query
@@ -137,44 +123,22 @@ class ChatLLM:
 
 
     def add_user_history(self, user_input: str) -> None:
-        self._history.append({
-            "role": "user",
-            "parts": [{"text": user_input}]
-        })
+        self._history.append(self._llm_adapter.user_message(user_input))
 
 
     def add_model_history(self, response: str) -> None:
-        self._history.append({
-            "role": "model",
-            "parts": [{"text": response}]
-        })
+        self._history.append(self._llm_adapter.model_message(response))
 
 
     def add_function_call_history(self, tool_name: str, tool_args: dict) -> None:
-        self._history.append({
-            "role": "model",
-            "parts": [{
-                "function_call": {
-                    "name": tool_name,
-                    "args": tool_args
-                }
-            }]
-        })
+        self._history.append(self._llm_adapter.tool_call_message(tool_name, tool_args))
 
 
     def add_function_response_history(self, tool_name: str, result: str) -> None:
-        self._history.append({
-            "role": "user",
-            "parts": [{
-                "function_response": {
-                    "name": tool_name,
-                    "response": {"result": result}
-                }
-            }]
-        })
+        self._history.append(self._llm_adapter.tool_response_message(tool_name, result))
 
 
-    def _auto_compact(self, new_message: dict[str, str | list] | None = None) -> None:
+    def _auto_compact(self, new_message: dict[str, Any] | None = None) -> None:
         if not self._auto_compact_enabled:
             return
 
@@ -197,11 +161,7 @@ class ChatLLM:
 
 
     def query_chat(self, user_input: str, chunks: str | None) -> str | None:
-        new_message = {
-            "role": "user",
-            "parts": [{"text": self._construct_query(chunks, user_input)}]
-        }
-
+        new_message = self._llm_adapter.user_message(self._construct_query(chunks, user_input))
         self._apply_rolling_window()
         self._auto_compact(new_message)
         payload = self._history + [new_message]
@@ -219,22 +179,16 @@ class ChatLLM:
             return None
 
         try:
-            response = execute_with_retries(
-                api_func=self._client.models.generate_content,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+            response = self._llm_adapter.generate_text(
                 model=self._chat_model,
                 contents=payload,
-                config={
-                    "system_instruction": AXON_SYSTEM_PROMPT,
-                    "temperature": LLM_CHAT_TEMP
-                }
+                system_instruction=AXON_SYSTEM_PROMPT,
+                temperature=LLM_CHAT_TEMP,
             )
 
-            response_text = response.text.strip()
             self.add_user_history(user_input)
-            self.add_model_history(response_text)
-            return response_text
+            self.add_model_history(response)
+            return response
 
         except Exception as e:
             self._console.print(f"\n❌ [bold red]Generation Error: {e}[/bold red]")
@@ -242,7 +196,7 @@ class ChatLLM:
         return None
 
 
-    def query_agent(self, tools: list) -> Any:
+    def query_agent(self, tools: list) -> list[dict[str, Any]]:
         self._apply_rolling_window()
         self._auto_compact()
         payload_len = self.get_token_count(self._history)
@@ -259,20 +213,13 @@ class ChatLLM:
             return None
 
         try:
-            response = execute_with_retries(
-                api_func=self._client.models.generate_content,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+            return self._llm_adapter.generate_with_tools(
                 model=self._chat_model,
                 contents=self._history,
-                config={
-                    "system_instruction": AXON_SYSTEM_PROMPT,
-                    "temperature": LLM_CHAT_TEMP,
-                    "tools": tools
-                }
+                system_instruction=AXON_SYSTEM_PROMPT,
+                tools=tools,
+                temperature=LLM_CHAT_TEMP,
             )
-
-            return response
 
         except Exception as e:
             self._console.print(f"\n❌ [bold red]Generation Error: {e}[/bold red]")
@@ -298,25 +245,15 @@ class ChatLLM:
         )
 
         try:
-            response = execute_with_retries(
-                api_func=self._client.models.generate_content,
-                console=self._console,
-                num_retries=MAX_RETRIES,
+            response = self._llm_adapter.generate_text(
                 model=self._compact_model,
-                contents = compact_content,
-                config={
-                    "system_instruction": COMPACT_SYSTEM_PROMPT,
-                    "temperature": LLM_COMPACT_TEMP
-                }
+                contents=self._llm_adapter.text_message(compact_content),
+                system_instruction=COMPACT_SYSTEM_PROMPT,
+                temperature=LLM_COMPACT_TEMP,
             )
 
-            response_text = response.text.strip()
-            self._history = [{
-                "role": "user",
-                "parts": [{"text": response_text}]
-            }]
-
-            return response_text
+            self._history = self._llm_adapter.text_message(response)
+            return response
 
         except Exception as e:
             self._console.print(f"\n❌ [bold red]Compaction Error: {e}[/bold red]")
