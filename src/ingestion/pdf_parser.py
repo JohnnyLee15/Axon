@@ -15,6 +15,7 @@ from src.utils.config import *
 from src.utils.device_utils import get_docling_device
 from src.trackers.document_state import DocumentState, ParsedDoc
 from src.llm.llm_adapter import LLMAdapter
+from src.llm.history import text_message
 
 
 class PdfParser:
@@ -111,7 +112,7 @@ class PdfParser:
 
                 parsed_args = self._llm_adapter.generate_json(
                     model=self._model,
-                    contents=self._llm_adapter.text_message(prompt),
+                    contents=text_message(prompt),
                     system_instruction=TITLE_PROMPT,
                     schema=TITLE_SCHEMA,
                     temperature=LLM_METADATA_MODEL_TEMPERATURE,
@@ -230,7 +231,7 @@ class PdfParser:
 
             parsed_args = self._llm_adapter.generate_json(
                 model=self._model,
-                contents=self._llm_adapter.text_message(formatted_prompt),
+                contents=text_message(formatted_prompt),
                 system_instruction=LLM_CURATION_PROMPT,
                 schema=CURATION_TOOL,
                 temperature=LLM_CURATION_MODEL_TEMPERATURE,

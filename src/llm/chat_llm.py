@@ -4,6 +4,24 @@ from rich.console import Console
 
 from src.utils.config import *
 from src.llm.llm_adapter import LLMAdapter
+from .history import (
+    user_message,
+    model_message,
+    text_message,
+    tool_call,
+    tool_response,
+)
+from .history import (
+    USER_TEXT,
+    MODEL_TEXT,
+    TOOL_CALL,
+    TOOL_RESPONSE,
+    NAME,
+    ARGS,
+    TEXT,
+    TYPE,
+    RESULT,
+)
 
 
 class ChatLLM:
@@ -21,6 +39,10 @@ class ChatLLM:
 
     def set_chat_llm(self, model: str) -> None:
         self._chat_model = model
+
+
+    def set_llm_adapter(self, llm_adapter: LLMAdapter) -> None:
+        self._llm_adapter = llm_adapter
 
 
     def set_chat_limit(self, limit: int) -> None:
@@ -70,18 +92,20 @@ class ChatLLM:
         return 0
 
 
-    def _stringify_history_chat(self, role: str, part: dict) -> str:
-        if "text" in part:
-            return f"{role}: {part['text']}"
+    def _stringify_history_chat(self, item: dict[str, Any]) -> str:
+        item_type = item[TYPE]
 
-        if "function_call" in part:
-            fc = part["function_call"]
-            return f"{role}: called tool {fc['name']} with args {fc['args']}"
+        if item_type == USER_TEXT:
+            return f"User: {item[TEXT]}"
 
-        if "function_response" in part:
-            fr = part["function_response"]
-            result = fr["response"]["result"]
-            return f"{role}: tool {fr['name']} returned {result}"
+        if item_type == MODEL_TEXT:
+            return f"Model: {item[TEXT]}"
+
+        if item_type == TOOL_CALL:
+            return f"Model: called {item[NAME]} with args {item[ARGS]}"
+
+        if item_type == TOOL_RESPONSE:
+            return f"User: tool {item[NAME]} returned {item[RESULT]}"
 
         return ""
 
@@ -90,10 +114,8 @@ class ChatLLM:
         recent_turns = self._history[-REWRITE_MESSAGES:]
 
         transcript = ""
-        for msg in recent_turns:
-            role = "User" if msg["role"] == "user" else "Model"
-            content = self._stringify_history_chat(role, msg["parts"][0])
-            transcript += f"{content}\n"
+        for item in recent_turns:
+            transcript += f"{self._stringify_history_chat(item)}\n"
 
         user_contents = (
             f"<chat_history>\n{transcript.strip()}\n</chat_history>\n"
@@ -103,7 +125,7 @@ class ChatLLM:
         try:
             return self._llm_adapter.generate_text(
                 model=self._rewrite_model,
-                contents=self._llm_adapter.text_message(user_contents),
+                contents=text_message(user_contents),
                 system_instruction=REWRITE_SYSTEM_PROMPT,
                 temperature=LLM_REWRITE_TEMP,
             )
@@ -123,19 +145,19 @@ class ChatLLM:
 
 
     def add_user_history(self, user_input: str) -> None:
-        self._history.append(self._llm_adapter.user_message(user_input))
+        self._history.append(user_message(user_input))
 
 
     def add_model_history(self, response: str) -> None:
-        self._history.append(self._llm_adapter.model_message(response))
+        self._history.append(model_message(response))
 
 
     def add_function_call_history(self, tool_name: str, tool_args: dict) -> None:
-        self._history.append(self._llm_adapter.tool_call_message(tool_name, tool_args))
+        self._history.append(tool_call(tool_name, tool_args))
 
 
     def add_function_response_history(self, tool_name: str, result: str) -> None:
-        self._history.append(self._llm_adapter.tool_response_message(tool_name, result))
+        self._history.append(tool_response(tool_name, result))
 
 
     def _auto_compact(self, new_message: dict[str, Any] | None = None) -> None:
@@ -161,7 +183,7 @@ class ChatLLM:
 
 
     def query_chat(self, user_input: str, chunks: str | None) -> str | None:
-        new_message = self._llm_adapter.user_message(self._construct_query(chunks, user_input))
+        new_message = user_message(self._construct_query(chunks, user_input))
         self._apply_rolling_window()
         self._auto_compact(new_message)
         payload = self._history + [new_message]
@@ -233,10 +255,8 @@ class ChatLLM:
             return None
 
         transcript = ""
-        for msg in self._history:
-            role = "User" if msg["role"] == "user" else "Model"
-            content = self._stringify_history_chat(role, msg["parts"][0])
-            transcript += f"{content}\n"
+        for item in self._history:
+            transcript += f"{self._stringify_history_chat(item)}\n"
 
         compact_content = (
             "Compress the following conversation history into a self-contained "
@@ -247,12 +267,12 @@ class ChatLLM:
         try:
             response = self._llm_adapter.generate_text(
                 model=self._compact_model,
-                contents=self._llm_adapter.text_message(compact_content),
+                contents=text_message(compact_content),
                 system_instruction=COMPACT_SYSTEM_PROMPT,
                 temperature=LLM_COMPACT_TEMP,
             )
 
-            self._history = self._llm_adapter.text_message(response)
+            self._history = text_message(response)
             return response
 
         except Exception as e:

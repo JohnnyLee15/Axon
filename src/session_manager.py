@@ -1,3 +1,10 @@
+from rich.console import Console
+from typing import Any
+import os
+import sqlite3
+import time
+from pathlib import Path
+
 from src.ingestion.semantic_chunker import SemanticChunker
 from src.ingestion.pdf_parser import PdfParser
 from src.db.vector_database import VectorDatabase
@@ -10,19 +17,12 @@ from src.retrieval.mlx_chunk_reranker import MLXChunkReranker
 from src.retrieval.torch_chunk_reranker import TorchChunkReranker
 from src.utils.device_utils import get_torch_device
 from src.agent.agent_tools import AgentTools
-from src.llm.gemini_adapter import GeminiAdapter
-
-from rich.console import Console
-from typing import Any
-import os
-import sqlite3
-import time
-from pathlib import Path
+from src.llm.llm_factory import create_llm_adapter
 
 class SessionManager:
     def __init__(self):
         self._console = Console()
-        self._llm_adapter = GeminiAdapter(self._console)
+        self._llm_adapter = create_llm_adapter(LLM_CHAT_MODEL_DEFAULT, self._console)
         self._parser = PdfParser(self._console, self._llm_adapter)
         self._chunker = SemanticChunker(self._console)
         self._db = VectorDatabase(self._console)
@@ -46,16 +46,6 @@ class SessionManager:
             "read_file": self._agent_tools.read_file,
             "insert_to_file": self._agent_tools.insert_to_file
         }
-        self._api_tools = [{
-            "function_declarations": [
-                SEARCH_FOR_CHUNKS,
-                EXECUTE_BASH_CMD,
-                CREATE_FILE,
-                REPLACE_IN_FILE,
-                READ_FILE,
-                INSERT_TO_FILE
-            ]
-        }]
 
 
     def _init_reranker(self) -> None:
@@ -181,9 +171,9 @@ class SessionManager:
 
 
     def _select_item_from_id_dict(self, id_dicts: list[dict[str, str]]) -> Any:
-        model_labels = [item["label"] for item in id_dicts]
+        labels = [item["label"] for item in id_dicts]
         label_to_id = {item["label"]: item["id"] for item in id_dicts}
-        return label_to_id[self._ui.select_item(model_labels)]
+        return label_to_id[self._ui.select_item(labels)]
 
 
     def _help(self) -> None:
@@ -419,7 +409,11 @@ class SessionManager:
 
     def _select_model(self) -> None:
         selected_model = self._select_item_from_id_dict(LLMS)
+
+        self._llm_adapter = create_llm_adapter(selected_model, self._console)
+        self._llm.set_llm_adapter(self._llm_adapter)
         self._llm.set_chat_llm(selected_model)
+
         self._console.print(f"\n🤖 [bold]Using Model:[/bold] {selected_model}")
 
 
@@ -555,7 +549,7 @@ class SessionManager:
 
         while agent_running:
             with self._ui.wait():
-                response = self._llm.query_agent(self._api_tools)
+                response = self._llm.query_agent(TOOL_SCHEMAS)
 
             if not response:
                 return

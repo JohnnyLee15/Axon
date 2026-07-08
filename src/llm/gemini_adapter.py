@@ -10,6 +10,7 @@ from .llm_adapter import LLMAdapter
 from src.utils.api_utils import execute_with_retries
 from src.utils.config import GEM_API_KEY, MAX_RETRIES
 
+
 class GeminiAdapter(LLMAdapter):
     def __init__(self, console: Console) -> None:
         self._console = console
@@ -57,6 +58,7 @@ class GeminiAdapter(LLMAdapter):
         contents: list[dict[str, Any]],
         system_instruction: str | None = None
     ) -> int:
+        contents = self.format_history(contents)
         if system_instruction:
             contents = [
                 self.user_message(f"SYSTEM_INSTRUCTION:\n{system_instruction}")
@@ -86,7 +88,7 @@ class GeminiAdapter(LLMAdapter):
             console=self._console,
             num_retries=MAX_RETRIES,
             model=model,
-            contents=contents,
+            contents=self.format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
@@ -110,7 +112,7 @@ class GeminiAdapter(LLMAdapter):
             console=self._console,
             num_retries=MAX_RETRIES,
             model=model,
-            contents=contents,
+            contents=self.format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
@@ -140,11 +142,11 @@ class GeminiAdapter(LLMAdapter):
             console=self._console,
             num_retries=MAX_RETRIES,
             model=model,
-            contents=contents,
+            contents=self.format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
-                tools=tools,
+                tools=self.format_tools(tools),
             ),
         )
 
@@ -198,3 +200,13 @@ class GeminiAdapter(LLMAdapter):
                 },
             }],
         }
+
+
+    def format_tools(
+        self,
+        tools: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
+        if not tools:
+            return None
+
+        return [{"function_declarations": tools}]

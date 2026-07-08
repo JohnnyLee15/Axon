@@ -250,6 +250,13 @@ Tool Use:
 - If tool results are incomplete, empty, irrelevant, or erroring, recover when reasonable; otherwise continue with best-effort reasoning and be honest about the limitation.
 - Do not mention internal tool names, raw tool payloads, hidden formatting, or implementation details unless the user explicitly asks.
 
+Task Completion:
+- While working on a multi-step task, use tools as needed without giving a final answer prematurely.
+- After you have completed all necessary tool calls and no further tool is needed, provide a final answer to the user.
+- Do not treat successful tool execution alone as task completion unless the user only asked you to perform an action and no explanation is needed.
+- Do not return an empty response after using tools.
+- If the task cannot be completed with the available tool results, explain what was done, what is missing, and give the best possible answer.
+
 Tool Recovery:
 - Treat tool failures, empty outputs, and unexpected results as diagnostic information, not final answers by themselves.
 - When a tool result does not resolve the task, make a reasonable next attempt if there is a safe, obvious way to refine, broaden, or verify the action.
@@ -389,6 +396,15 @@ LLMS = [
     {"id": "gemini-2.5-pro", "label": "gemini-2.5-pro (high cost | quality #2)"},
     {"id": "gemini-3.1-pro-preview", "label": "gemini-3.1-pro-preview (most expensive | quality #1)"},
 ]
+GEMINI_PROVIDER = "gemini"
+MODEL_TO_PROVIDER = {
+    "gemini-2.5-flash-lite": GEMINI_PROVIDER,
+    "gemini-2.5-flash": GEMINI_PROVIDER,
+    "gemini-3.1-flash-lite-preview": GEMINI_PROVIDER,
+    "gemini-3-flash-preview": GEMINI_PROVIDER,
+    "gemini-2.5-pro": GEMINI_PROVIDER,
+    "gemini-3.1-pro-preview": GEMINI_PROVIDER,
+}
 CHAT_LIMITS = [
     {"id": 10000, "label": "10,000 (small)"},
     {"id": 20000, "label": "20,000 (short)"},
@@ -576,3 +592,11 @@ INSERT_TO_FILE = {
         "required": ["path", "insert_text"]
     }
 }
+TOOL_SCHEMAS = [
+    SEARCH_FOR_CHUNKS,
+    EXECUTE_BASH_CMD,
+    CREATE_FILE,
+    REPLACE_IN_FILE,
+    READ_FILE,
+    INSERT_TO_FILE,
+]
