@@ -1,34 +1,22 @@
-from src.utils.config import *
+from .backend import RerankerBackend
 
-from typing import Any
+
+RERANK_BATCH_SIZE = 10
+FINAL_CHUNK_K = 5
+MIN_RERANK_SCORE = 0.20
+
 
 class Reranker:
-    def __init__(self) -> None:
-        self._reranker = None
-        self._init()
-
-
-    def _init(self) -> None:
-        raise ValueError("Implement this method in subclass. This is an abstract method.")
-
-
-    def _set_reranker(self, reranker: Any) -> None:
-        self._reranker = reranker
-
-
-    def _get_reranker(self) -> Any:
-        if self._reranker is None:
-            raise ValueError("Reranker has not been initialized.")
-        return self._reranker
-
+    def __init__(self, backend: RerankerBackend) -> None:
+        self._backend = backend
 
     def rank_chunks(
         self,
         query: str,
         chunks: dict[int, dict[str, str | int]]
-    ) -> dict[int, dict[str, str | int]] | None:
+    ) -> dict[int, dict[str, str | int]]:
         if not chunks:
-            return None
+            return {}
 
         cids = [cid for cid in chunks]
         docs = [chunks[cid]["text"] for cid in chunks]
@@ -39,7 +27,7 @@ class Reranker:
             doc_batch = docs[i : end_idx]
             cid_batch = cids[i: end_idx]
 
-            results = self._reranker.rerank(query=query, documents=doc_batch)
+            results = self._backend.rerank(query=query, documents=doc_batch)
             for result in results:
                 cid = cid_batch[result["index"]]
                 score = result["relevance_score"]

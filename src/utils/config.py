@@ -90,12 +90,6 @@ REFERENCE_HEADERS = [
     "selected bibliography"
 ]
 
-# ------ ReRanker Constants ------
-MLX_RERANKER = "jinaai/jina-reranker-v3-mlx"
-PYTORCH_RERANKER = "jinaai/jina-reranker-v3"
-RERANK_BATCH_SIZE = 10
-FINAL_CHUNK_K = 5
-MIN_RERANK_SCORE = 0.20
 
 EXCLUDED_DOCLING_LABELS = {
     DocItemLabel.PAGE_HEADER,

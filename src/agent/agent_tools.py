@@ -59,7 +59,7 @@ class AgentTools:
     ) -> dict:
         embedding = self._chunker.embed_query(query)
         chunks = self._db.top_chunk_matches(query, embedding)
-        best_chunks = self._reranker.rank_chunks(query, chunks) or {}
+        best_chunks = self._reranker.rank_chunks(query, chunks)
         formatted_chunks = self._format_chunks(best_chunks)
         return {
             "content": formatted_chunks,

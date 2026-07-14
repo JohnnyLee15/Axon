@@ -11,9 +11,7 @@ from src.ui.formatters import emphasis
 from src.ingestion.ingestion_runner import IngestionRunner
 from src.ingestion.semantic_chunker import SemanticChunker
 from src.ingestion.pdf_parser import PdfParser
-from src.retrieval.mlx_chunk_reranker import MLXChunkReranker
-from src.retrieval.torch_chunk_reranker import TorchChunkReranker
-from src.utils.device_utils import get_torch_device
+from src.retrieval.factory import create_reranker
 from src.agent.agent_tools import AgentTools
 from src.llm.chat_llm import ChatLLM
 from src.llm.llm_factory import create_llm_adapter
@@ -41,18 +39,9 @@ class SessionManager:
 
         self._agent_mode_enabled = False
 
-        self._init_reranker()
+        self._reranker = create_reranker()
         self._init_session_components()
         self._init_command_processor()
-
-
-    def _init_reranker(self) -> None:
-        device = get_torch_device()
-
-        if device.type == "mps":
-            self._reranker = MLXChunkReranker()
-        else:
-            self._reranker = TorchChunkReranker()
 
 
     def _init_session_components(self) -> None:
