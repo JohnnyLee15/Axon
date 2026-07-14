@@ -5,7 +5,7 @@ from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.formatted_text import ANSI
 
-from src.utils.config import *
+from .theme import ANSI_COLOURS, theme_colour
 
 class SelectMenu:
     def __init__(self):
@@ -25,17 +25,19 @@ class SelectMenu:
             erase_when_done=True
         )
 
+
     def _get_list(self) -> ANSI:
         item_list_str = ""
 
         for i, item in enumerate(self._items):
             is_highlighted = (i == self._highlighted_idx)
-            prefix = f"{CYAN}{BOLD}>{RESET} " if is_highlighted else "  "
-            style = REVERSE if is_highlighted else ""
-            item_list_str += f"{prefix}{style}{BOLD}{item}{RESET}\n"
+            prefix = f"{theme_colour(ansi=True)}{ANSI_COLOURS.BOLD}>{ANSI_COLOURS.RESET} " if is_highlighted else "  "
+            style = ANSI_COLOURS.REVERSE if is_highlighted else ""
+            item_list_str += f"{prefix}{style}{ANSI_COLOURS.BOLD}{item}{ANSI_COLOURS.RESET}\n"
 
         item_list_str +=  "\n↑/↓ to move and Enter to select."
         return ANSI(item_list_str)
+
 
     def _bind_keys(self) -> None:
         @self._kb.add("up")
@@ -54,6 +56,7 @@ class SelectMenu:
             self._highlighted_idx = 0
             self._items = []
             event.app.exit(result=selected_item)
+
 
     def select_item(self, items: list[str]) -> str | None:
         if not items:

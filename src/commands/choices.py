@@ -1,0 +1,3 @@
+CONFIRM_YES = "y"
+CONFIRM_NO = "n"
+CONFIRM_TRUST = "t"

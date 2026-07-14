@@ -66,7 +66,6 @@ LSH_ROWS = 16
 NUM_MIN_HASH_FUNCS = LSH_BANDS * LSH_ROWS
 MIN_HASH_SEED = 16
 NUM_CHARS_PER_SHINGLE = 5
-JACCARD_CUTOFF = 0.84
 NORMALIZE_DOC_PATTERN = re.compile(r"[^a-z0-9]")
 
 # ------ Semantic Chunker Constants ------
@@ -405,45 +404,11 @@ MODEL_TO_PROVIDER = {
     "gemini-2.5-pro": GEMINI_PROVIDER,
     "gemini-3.1-pro-preview": GEMINI_PROVIDER,
 }
-CHAT_LIMITS = [
-    {"id": 10000, "label": "10,000 (small)"},
-    {"id": 20000, "label": "20,000 (short)"},
-    {"id": 50000, "label": "50,000 (medium)"},
-    {"id": 100000, "label": "100,000 (large)"},
-    {"id": 200000, "label": "200,000 (huge)"},
-    {"id": 750000, "label": "750,000 (max)"}
-]
 
 # ------ API Constants ------
 API_BUSY_ERROR_CODES = ["503", "429"]
 MAX_RETRIES = 3
 
-
-# ------ UI Constants ------
-LOGO = """
-⠀⠀⠀⣤⣤⣤⣤⣤⣤⣤⠀⠀⠀⢠⣤⣤⣤⣤⡀⠀⠀⣠⣤⣤⣤⣤⠀⠀⠀⢀⣀⣤⣤⣤⣄⣀⠀⠀⠀⠀⢠⣤⣤⣤⣄⠀⠀⢠⣤⣤⣤⣤
-⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠘⣿⣿⣿⣿⣧⠀⢰⣿⣿⣿⣿⡏⠀⢀⣴⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⢸⣿⣿⣿⣿⣆⠀⢸⣿⣿⣿⣿
-⠀⠀⣾⣿⣿⣿⣿⣿⣿⣿⣷⠀⠀⠀⠸⣿⣿⣿⣿⣆⣿⣿⣿⣿⡟⠀⠀⣾⣿⣿⣿⣿⡿⣿⣿⣿⣿⣿⡆⠀⢸⣿⣿⣿⣿⣿⡄⢸⣿⣿⣿⣿
-⠀⢠⣿⣿⣿⣿⠹⣿⣿⣿⣿⡄⠀⠀⠀⠙⣿⣿⣿⣿⣿⣿⣿⠟⠀⠀⢸⣿⣿⣿⣿⡏⠀⢸⣿⣿⣿⣿⣿⠀⢸⣿⣿⣿⣿⣿⣷⣸⣿⣿⣿⣿
-⠀⢸⣿⣿⣿⣿⠀⣿⣿⣿⣿⣇⠀⠀⠀⢀⣼⣿⣿⣿⣿⣿⣧⡀⠀⠀⢸⣿⣿⣿⣿⡇⠀⠀⣿⣿⣿⣿⣿⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⠀⣿⣿⣿⣿⣿⣤⣿⣿⣿⣿⣿⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⡄⠀⢸⣿⣿⣿⣿⣇⠀⢰⣿⣿⣿⣿⣿⠀⢸⣿⣿⣿⣿⢹⣿⣿⣿⣿⣿⣿
-⢰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⠀⣼⣿⣿⣿⣿⠇⣿⣿⣿⣿⣿⡀⠘⣿⣿⣿⣿⣿⣶⣾⣿⣿⣿⣿⡏⠀⢸⣿⣿⣿⣿⠀⢻⣿⣿⣿⣿⣿
-⣸⣿⣿⣿⣿⠋⠉⠙⣿⣿⣿⣿⣧⢠⣿⣿⣿⣿⡿⠀⢸⣿⣿⣿⣿⣇⠀⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠀⠀⢸⣿⣿⣿⣿⠀⠈⣿⣿⣿⣿⣿
-⠛⠻⠿⠿⠛⠀⠀⠀⠛⠿⠿⠿⠛⠸⠿⠿⠿⠿⠃⠀⠀⠻⠿⠿⠿⠿⠀⠀⠀⠙⠛⠻⠿⠿⠛⠋⠁⠀⠀⠀⠘⠛⠿⠿⠛⠀⠀⠘⠛⠿⠿⠟
-"""
-WELCOME_MESSAGE = """Good to see you — let's skip the reading and get straight to the facts.
-Type [bold cyan]/help[/bold cyan] at any time to see available commands.
-
-[dim](Tip: Enter to send | Esc + Enter for newline)[/dim]"""
-MAIN_COLOUR_RICH = "cyan"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW =  "\033[33m"
-RED = "\033[31m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-DIM = "\033[2m"
-REVERSE = "\033[7m"
 
 # ------ Agent Tools ------
 SEARCH_FOR_CHUNKS = {

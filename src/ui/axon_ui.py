@@ -1,360 +1,100 @@
-from rich.console import Console, Group, NewLine
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
+from typing import Any
+
+from rich.console import Console
 from rich.live import Live
-from rich.markdown import Markdown
-from rich import box
-from rich.spinner import Spinner
-from rich.syntax import Syntax
 
-import math
-import time
-from pathlib import Path
-
-from prompt_toolkit import prompt
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.formatted_text import ANSI
-
-from pylatexenc.latex2text import LatexNodes2Text
-
-from src.utils.config import *
 from src.ui.select_menu import SelectMenu
-from src.utils.file_utils import get_path_relative_to_project_root
+
+from .prompt import Prompt
+from .tool_renderers import ToolRenderers
+from .views import Views
+from .messages import Messages
+
+OPTION_ID_KEY = "id"
+OPTION_LABEL_KEY = "label"
+
 
 class AxonUI:
     def __init__(self, console: Console):
         # TODO add a name to the database
         self._console = console
-        self._latex_converter = LatexNodes2Text()
+        self._prompt = Prompt(self._console)
+        self._tool_renderers = ToolRenderers(self._console)
+        self._views = Views(self._console)
+        self._messages = Messages(self._console)
         self._select_menu = SelectMenu()
-        self._kb = KeyBindings()
-        self._bind_keys()
-        self._display_welcome()
-        self._init_renderers()
-
-
-    def _init_renderers(self) -> None:
-        self._tool_renderers = {
-            "search_for_chunks": self._render_rag_search,
-            "replace_in_file": self._render_replace_in_file,
-            "execute_bash_cmd": self._render_bash,
-            "create_file": self._render_create_file,
-            "read_file": self._render_read_file,
-            "insert_to_file": self._render_insert_to_file
-        }
-
-        self._arg_renderers = {
-            "search_for_chunks": self._render_args_rag,
-            "replace_in_file": self._render_args_replace_in_file,
-            "execute_bash_cmd": self._render_args_bash,
-            "create_file": self._render_args_create_file,
-            "read_file": self._render_args_read_file,
-            "insert_to_file": self._render_args_insert_to_file
-        }
-
-
-    def _render_replace_in_file(self, results: dict) -> None:
-        output = results["content"]
-        diff = results.get("diff", None)
-
-        if diff:
-            syntax = Syntax(diff, "diff", theme="monokai", word_wrap=True)
-            self._console.print(Panel(syntax, title="[bold]✨ File Edits[/bold]"))
-        else:
-            self._console.print(Panel(output, title="[bold]⚠️ Edit Status[/bold]"))
-
-
-    def _render_bash(self, results: dict) -> None:
-        output = results["content"]
-        syntax = Syntax(output, "bash", theme="monokai", word_wrap=True)
-        self._console.print(Panel(syntax, title="[bold]💻 Terminal Output[/bold]"))
-
-
-    def _render_create_file(self, results: dict) -> None:
-        output = results["content"]
-        self._console.print(Panel(output, title="[bold]📝 File Status[/bold]"))
-
-
-    def _render_rag_search(self,  results: dict) -> None:
-        result_text = results["content"]
-        if not result_text:
-            self._console.print(Panel("No relevant chunks found in the database.", title="[bold]📄 RAG Search Results[/bold]"))
-            return
-
-        chunk_count = results.get("chunk_count", 0)
-        doc_count = results.get("doc_count", 0)
-
-        summary = (
-            f"🔍 Successfully extracted [bold cyan]{chunk_count}[/bold cyan] semantic chunks "
-            f"across [bold cyan]{doc_count}[/bold cyan] relevant document(s)."
-        )
-        self._console.print(Panel(summary, title="[bold]📄 RAG Search Results[/bold]"))
-
-
-    def _render_read_file(self, results: dict) -> None:
-        start_line = results.get("start_line", None)
-        end_line = results.get("end_line", None)
-
-        if start_line is None or end_line is None:
-            self._console.print(Panel(results["content"], title="[bold]⚠️ Error Reading File[/bold]"))
-            return
-
-        self._console.print(Panel(
-            f"✅ Successfully read lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan] into memory.",
-            title="[bold]📄 File Read[/bold]"
-        ))
-
-
-    def _render_insert_to_file(self, results: dict) -> None:
-        output = results["content"]
-        diff = results.get("diff", None)
-
-        if diff:
-            syntax = Syntax(diff, "diff", theme="monokai", word_wrap=True)
-            self._console.print(Panel(syntax, title="[bold]✨ File Edits[/bold]"))
-        else:
-            self._console.print(Panel(output, title="[bold]⚠️ Edit Status[/bold]"))
-
-
-    def display_tool_output(self, tool_name: str, results: dict) -> None:
-        renderer = self._tool_renderers[tool_name]
-        self._console.print()
-        renderer(results)
-
-
-    def _render_args_bash(self, args: dict) -> None:
-        cmd = args.get("cmd", "")
-        syntax = Syntax(cmd, "bash", theme="monokai", word_wrap=True)
-        self._console.print(Panel(syntax, title="[bold]⚡ Axon is Running[/bold]"))
-
-
-    def _render_args_replace_in_file(self, args: dict) -> None:
-        filepath = args.get("path", "Unknown path")
-        old_str = args.get("old_str", "")
-        new_str = args.get("new_str", "")
-
-        display_path = get_path_relative_to_project_root(filepath)
-        display_str = str(display_path) if display_path else filepath
-        ext = display_str.split(".")[-1] if "." in display_str else "text"
-
-        search_syntax = Syntax(old_str, ext, theme="monokai", word_wrap=True)
-        replace_syntax = Syntax(new_str, ext, theme="monokai", word_wrap=True)
-
-        group = Group(
-            Text("🔍 Replacing this exact block:"),
-            search_syntax,
-            Text("\n✨ With this new block:"),
-            replace_syntax
-        )
-
-        self._console.print(Panel(group, title=f"[bold]⚡ Intended Edit: [cyan]{display_str}[/cyan][/bold]"))
-
-
-    def _render_args_create_file(self, args: dict) -> None:
-        filepath = args.get("path", "Unknown file")
-        content = args.get("content", "")
-
-        display_path = get_path_relative_to_project_root(filepath)
-        display_str = str(display_path) if display_path else filepath
-        ext = display_str.split(".")[-1] if "." in display_str else "text"
-
-        syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
-        self._console.print(Panel(syntax, title=f"[bold]📋 Creating File: [cyan]{display_str}[/cyan][/bold]"))
-
-
-    def _render_args_rag(self, args: dict) -> None:
-        query = args.get("query", "")
-        self._console.print(f"[bold]🧠 Axon is searching memory for: [cyan]\"{query}\"[/cyan][/bold]")
-
-
-    def _render_args_read_file(self, args: dict) -> None:
-        filepath = args.get("path", "")
-        start_line = args.get("start_line", 1)
-        end_line = args.get("end_line", "EOF")
-
-        display_path = get_path_relative_to_project_root(filepath)
-        display_str = str(display_path) if display_path else filepath
-
-        self._console.print(Panel(
-            f"Scanning lines [bold cyan]{start_line}[/bold cyan] to [bold cyan]{end_line}[/bold cyan]",
-            title=f"[bold]📖 Inspecting File: [cyan]{display_str}[/cyan][/bold]",
-        ))
-
-
-    def _render_args_insert_to_file(self, args: dict) -> None:
-        filepath = args.get("path", "Unknown file")
-        insert_text = args.get("insert_text", "")
-        insert_after_line = args.get("insert_after_line", None)
-
-        display_path = get_path_relative_to_project_root(filepath)
-        display_str = str(display_path) if display_path else filepath
-        ext = display_str.split(".")[-1] if "." in display_str else "text"
-
-        syntax = Syntax(insert_text, ext, theme="monokai", line_numbers=False, word_wrap=True)
-        self._console.print(Panel(
-            syntax,
-            title=f"[bold]📥 Inserting into [cyan]{display_str}[/cyan] after line [cyan]{insert_after_line}[/cyan][/bold]"
-        ))
-
-
-    def display_tool_args(self, tool_name: str, args: dict) -> None:
-        renderer = self._arg_renderers[tool_name]
-        self._console.print()
-        renderer(args)
-
-
-    def _display_welcome(self) -> None:
-        logo = Text(LOGO, style=f"bold {MAIN_COLOUR_RICH}")
-        table = Table(box=None, show_header=False, padding=0)
-        panel = Panel(
-            WELCOME_MESSAGE,
-            border_style="bold",
-            padding=(2,2),
-            title="[bold]Welcome[/bold]",
-            expand=False
-        )
-
-        table.add_column(justify="center")
-        table.add_row(logo)
-        table.add_row(panel)
-        self._console.print(table)
-
-
-    def _bind_keys(self) -> None:
-        @self._kb.add("enter")
-        def _(event):
-            event.current_buffer.validate_and_handle()
-
-        @self._kb.add("escape", "enter")
-        def _(event):
-            event.current_buffer.insert_text("\n")
-
-
-    def listen(self, curr_tokens: int, context_size: int) -> str:
-        percent_used = math.ceil((curr_tokens / context_size) * 100)
-        p_colour = GREEN if percent_used < 65 else YELLOW if percent_used < 90 else RED
-
-        p_text = f"[{p_colour}{percent_used}%{RESET}]"
-        you_text = f"[{CYAN}{BOLD}You{RESET}] {CYAN}{BOLD}>{RESET}"
-
-        return prompt(
-            ANSI(f"\n{p_text} {you_text} "),
-            multiline=True,
-            key_bindings=self._kb,
-            wrap_lines=True,
-            prompt_continuation=lambda prompt_width, line_number, wrap_count: ""
-        ).strip()
-
-
-    def wait(self):
-        renderable = Group(
-            NewLine(),
-            Spinner("dots", text=Text("Thinking...", style="bold"), style="bold")
-        )
-        return Live(
-            renderable,
-            console=self._console,
-            transient=True,
-            refresh_per_second=12
-        )
-
-
-    def stream_response(self, response: str) -> None:
-        response = self._latex_converter.latex_to_text(response)
-        display_text = "<br>**[Axon] >** "
-
-        with Live(
-            console=self._console,
-            refresh_per_second=30
-        ) as live:
-            for char in response:
-                display_text += char
-                live.update(Markdown(display_text))
-                time.sleep(0.001)
-
-
-    def select_item(self, items: list[str]) -> str:
-        return self._select_menu.select_item(items)
+        self._views.display_welcome()
 
 
     def display_help(self, commands: dict) -> None:
-        table = Table(
-            title="🧠 [bold]Axon Command Menu[/bold]",
-            expand=False,
-            header_style="bold",
-            box=box.ROUNDED,
-            padding=(0,2)
-        )
-        table.add_column("Command", style="bold cyan")
-        table.add_column("Description")
-
-        base_cmds = []
-        grouped_cmds = {}
-
-        for cmd in commands:
-            item = commands[cmd]
-            if "subcommands" in item:
-                grouped_cmds[cmd] = item["subcommands"]
-            else:
-                base_cmds.append(item)
-
-        for cmd in base_cmds:
-            table.add_row(cmd["usage"], cmd["desc"])
-
-        for cmd in grouped_cmds:
-            sub_cmds = grouped_cmds[cmd]
-            table.add_section()
-
-            for sub_cmd in sub_cmds:
-                props = sub_cmds[sub_cmd]
-                table.add_row(props["usage"], props["desc"])
-
-        self._console.print()
-        self._console.print(table)
+        self._views.display_help(commands)
 
 
     def display_chat_names(self, chat_names: list[str]) -> None:
-        if not chat_names:
-            self._console.print("\n📭 [bold yellow]No saved chats found in the database.[/bold yellow]")
-            return
-
-        list_contents = ""
-        for name in chat_names:
-            list_contents += f"  [dim]•[/dim] [cyan]\"{name}\"[/cyan]\n"
-
-        panel = Panel(
-            list_contents.rstrip(),
-            title ="📂 [bold]Saved Chats[/bold]",
-            title_align="center",
-            expand=False,
-            border_style="bold"
-        )
-
-        self._console.print("\n")
-        self._console.print(panel)
+        self._views.display_chat_names(chat_names)
 
 
     def display_references(self, papers: list[tuple]) -> None:
-        self._console.print()
-        self._console.rule(style="bold")
-        self._console.print("📚 [bold]References[/bold]")
+        self._views.display_references(papers)
 
-        for i, (title, doi, arxiv, pmcid, pmid) in enumerate(papers, start=1):
-            title = title if title else "Unknown Title"
 
-            identifiers = {
-                "DOI": doi,
-                "arXiv": arxiv,
-                "PMCID": pmcid,
-                "PMID": pmid
-            }
+    def display_section(self, title: str) -> None:
+        self._views.display_section(title)
 
-            id_str = " • ".join(
-                f"{paper_id}: {identifiers[paper_id]}" for paper_id in identifiers
-                if identifiers[paper_id] is not None
-            )
-            self._console.print(f"\n  [bold][[cyan]{i}[/cyan]] {title}[/bold]")
 
-            if id_str:
-                self._console.print(f"    • {id_str}", highlight=False)
+    def select_option(self, options: list[dict[str, Any]]) -> str:
+        labels = [option[OPTION_LABEL_KEY] for option in options]
+        label_to_id = {
+            option[OPTION_LABEL_KEY]: option[OPTION_ID_KEY]
+            for option in options
+        }
+        selected_label = self._select_menu.select_item(labels)
+        return label_to_id[selected_label]
+
+
+    def listen(self, curr_tokens: int, context_size: int) -> str:
+        return self._prompt.listen(curr_tokens, context_size)
+
+
+    def wait(self) -> Live:
+        return self._prompt.wait()
+
+
+    def stream_response(self, response: str) -> None:
+        self._prompt.stream_response(response)
+
+
+    def display_tool_output(self, tool_name: str, results: dict[str, Any]) -> None:
+        self._tool_renderers.display_tool_output(tool_name, results)
+
+
+    def display_tool_args(self, tool_name: str, args: dict) -> None:
+        self._tool_renderers.display_tool_args(tool_name, args)
+
+
+    def info(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.info(text, leading_blank)
+
+
+    def success(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.success(text, leading_blank)
+
+
+    def warning(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.warning(text, leading_blank)
+
+
+    def error(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.error(text, leading_blank)
+
+
+    def unknown(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.unknown(text, leading_blank)
+
+
+    def progress(self, text: str, leading_blank: bool = True) -> None:
+        self._messages.progress(text, leading_blank)
+
+
+    def confirm(self, text: str, leading_blank: bool = True) -> str:
+        return self._messages.confirm(text, leading_blank)

@@ -9,6 +9,9 @@ from src.utils.paper_utils import get_active_ids
 import json
 from rich.console import Console
 
+INVALID_PAPER_ID = -1
+
+
 class VectorDatabase:
     def __init__(self, console: Console) -> None:
         self._console = console
@@ -300,7 +303,7 @@ class VectorDatabase:
             cursor.close()
             conn.close()
 
-        return -1
+        return INVALID_PAPER_ID
 
 
     def insert_paper_chunks(self, chunks: dict[int, Chunk], paper_id: int) -> None:
