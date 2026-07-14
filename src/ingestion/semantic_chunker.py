@@ -27,11 +27,13 @@ from typing import Callable
 from rich.console import Console
 
 from src.utils.config import *
-from src.trackers.chunk_tracker import ChunkTracker, Chunk
-from src.trackers.document_state import Block
-from src.trackers.context_buffer_tracker import ContextBufferTracker
 from src.utils.device_utils import get_torch_device, get_dtype
 # from optimum.quanto import quantize, freeze, qint4
+
+from .chunk_tracker import ChunkTracker
+from .context_buffer_tracker import ContextBufferTracker
+from .models import Block, Chunk
+
 
 class SemanticChunker:
     def __init__(self, console: Console):
@@ -72,9 +74,9 @@ class SemanticChunker:
             return end_idx, end_idx
 
         last_ws_idx = start_idx + ws_match.start(1)
-        ws_cand = self._add_spacer(tracker.len(), sentence[start_idx:last_ws_idx], spacer=" ")
+        ws_cand = self._add_spacer(len(tracker), sentence[start_idx:last_ws_idx], spacer=" ")
 
-        if tracker.len() + len(ws_cand) >= MIN_CHUNK_CHARS:
+        if len(tracker) + len(ws_cand) >= MIN_CHUNK_CHARS:
             return last_ws_idx, last_ws_idx + 1
 
         return end_idx, end_idx
@@ -83,15 +85,15 @@ class SemanticChunker:
     def _split_sentence(self, tracker: ChunkTracker, sentence: str) -> None:
         start_idx = 0
         while start_idx < len(sentence):
-            spacer_len = 1 if tracker.len() > 0 else 0
-            end_idx = start_idx + MAX_CHUNK_CHARS - tracker.len() - spacer_len
+            spacer_len = 1 if len(tracker) > 0 else 0
+            end_idx = start_idx + MAX_CHUNK_CHARS - len(tracker) - spacer_len
 
             if end_idx >= len(sentence):
-                tracker.add_text(self._add_spacer(tracker.len(), sentence[start_idx:], spacer=" "))
+                tracker.add_text(self._add_spacer(len(tracker), sentence[start_idx:], spacer=" "))
                 return
 
             cut_idx, next_start = self._find_ws_cut_idx(tracker, sentence, start_idx, end_idx)
-            tracker.add_text(self._add_spacer(tracker.len(), sentence[start_idx:cut_idx], spacer=" "))
+            tracker.add_text(self._add_spacer(len(tracker), sentence[start_idx:cut_idx], spacer=" "))
             start_idx = next_start
             tracker.flush()
 
@@ -101,7 +103,7 @@ class SemanticChunker:
         text: str,
         split: Callable
     ) -> None:
-        if tracker.len() >= MIN_CHUNK_CHARS:
+        if len(tracker)>= MIN_CHUNK_CHARS:
             tracker.flush()
 
         if tracker.is_empty() and len(text) <= MAX_CHUNK_CHARS:
@@ -114,27 +116,27 @@ class SemanticChunker:
     def _split_block(self, tracker: ChunkTracker, block_text: str) -> None:
         sentences = self._seg.segment(block_text)
         for sentence in sentences:
-            cand_text = self._add_spacer(tracker.len(), sentence, spacer=" ")
+            cand_text = self._add_spacer(len(tracker), sentence, spacer=" ")
 
-            if tracker.len() + len(cand_text) <= MAX_CHUNK_CHARS:
+            if len(tracker) + len(cand_text) <= MAX_CHUNK_CHARS:
                 tracker.add_text(cand_text)
             else:
                 self._add_or_split(tracker, sentence, self._split_sentence)
 
 
     def _process_body(self, tracker: ChunkTracker, block_text: str) -> None:
-        cand_text = self._add_spacer(tracker.len(), block_text, spacer="\n\n")
-        if tracker.len() + len(cand_text) <= MAX_CHUNK_CHARS:
+        cand_text = self._add_spacer(len(tracker), block_text, spacer="\n\n")
+        if len(tracker) + len(cand_text) <= MAX_CHUNK_CHARS:
             tracker.add_text(cand_text)
         else:
             self._add_or_split(tracker, block_text, self._split_block)
 
 
     def _process_header(self, tracker: ChunkTracker, block_text: str) -> None:
-        cand_header = self._add_spacer(tracker.len(), block_text, spacer="\n\n")
+        cand_header = self._add_spacer(len(tracker), block_text, spacer="\n\n")
         flush_tracker = (
-            (tracker.len() >= MIN_CHUNK_CHARS and not tracker.last_was_header()) or
-            (tracker.last_was_header() and tracker.len() + len(cand_header) > MAX_HEADER_STACK_CHARS)
+            (len(tracker) >= MIN_CHUNK_CHARS and not tracker.last_was_header()) or
+            (tracker.last_was_header() and len(tracker) + len(cand_header) > MAX_HEADER_STACK_CHARS)
         )
         if flush_tracker:
             tracker.flush()
@@ -170,7 +172,7 @@ class SemanticChunker:
         tracker = ContextBufferTracker()
         for cid in sorted(chunks):
             chunk_text = chunks[cid].markdown
-            cand_text = self._add_spacer(tracker.len(), chunk_text, spacer="\n\n")
+            cand_text = self._add_spacer(len(tracker), chunk_text, spacer="\n\n")
 
             cand_toks_count = len(self._tokenizer(
                 tracker.get_curr_buffer() + cand_text,

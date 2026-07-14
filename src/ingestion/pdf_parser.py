@@ -13,9 +13,11 @@ from rich.console import Console
 
 from src.utils.config import *
 from src.utils.device_utils import get_docling_device
-from src.trackers.document_state import DocumentState, ParsedDoc
 from src.llm.llm_adapter import LLMAdapter
 from src.llm.history import text_message
+
+from .document_state import DocumentState
+from .models import ParsedDocument
 
 
 class PdfParser:
@@ -44,7 +46,7 @@ class PdfParser:
         )
 
 
-    def __call__(self, filepath: Path) -> ParsedDoc:
+    def __call__(self, filepath: Path) -> ParsedDocument:
         doc = self._converter.convert(filepath).document
         item_iter = iter(doc.iterate_items())
         tracker = DocumentState()
@@ -69,13 +71,13 @@ class PdfParser:
 
             self._extract_block(doc, item, level, tracker)
 
-        parsed_doc = tracker.get_doc_state()
+        parsed_doc = tracker.build()
         self._extract_metadata(parsed_doc, filepath)
         parsed_doc.blocks_reg = self._remove_noise_blocks(parsed_doc.blocks_reg)
         return parsed_doc
 
 
-    def _extract_pdf_ids(self, parsed_doc: ParsedDoc, filepath: Path) -> None:
+    def _extract_pdf_ids(self, parsed_doc: ParsedDocument, filepath: Path) -> None:
         flat_text = parsed_doc.page_one.replace("\n", " ").strip()
 
         doi_match = DOI_PATTERN.search(flat_text)
@@ -102,7 +104,7 @@ class PdfParser:
         if pmid_match:
             parsed_doc.pmid = pmid_match.group(1)
 
-    def _extract_metadata(self, parsed_doc: ParsedDoc, filepath: Path) -> None:
+    def _extract_metadata(self, parsed_doc: ParsedDocument, filepath: Path) -> None:
         self._extract_pdf_ids(parsed_doc, filepath)
 
         if not parsed_doc.title:

@@ -6,9 +6,11 @@ from rich.console import Console
 from google import genai
 from google.genai import types
 
-from .llm_adapter import LLMAdapter
 from src.utils.api_utils import execute_with_retries
 from src.utils.config import GEM_API_KEY, MAX_RETRIES
+
+from .llm_adapter import LLMAdapter
+from .contracts import LLM_CONTRACT
 
 
 class GeminiAdapter(LLMAdapter):
@@ -44,7 +46,7 @@ class GeminiAdapter(LLMAdapter):
                 continue
 
             for part in content.parts or []:
-                text = getattr(part, "text", None)
+                text = getattr(part, LLM_CONTRACT.TEXT, None)
                 if text:
                     text_parts.append(text)
 
@@ -153,14 +155,14 @@ class GeminiAdapter(LLMAdapter):
         tool_calls = []
         for call in response.function_calls or []:
             tool_calls.append({
-                "name": call.name,
-                "args": dict(call.args)
+                LLM_CONTRACT.NAME: call.name,
+                LLM_CONTRACT.ARGS: dict(call.args)
             })
 
         return {
-            "text": self._extract_text(response),
-            "tool_calls": tool_calls,
-            "raw": response
+            LLM_CONTRACT.TEXT: self._extract_text(response),
+            LLM_CONTRACT.TOOL_CALLS: tool_calls,
+            LLM_CONTRACT.RAW: response
         }
 
 

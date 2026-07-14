@@ -1,6 +1,6 @@
-from src.trackers.document_state import ParsedDoc
+from src.ingestion.models import ParsedDocument
 
-def get_active_ids(parsed_doc: ParsedDoc) -> str:
+def get_active_ids(parsed_doc: ParsedDocument) -> str:
     active_ids = []
     if parsed_doc.doi:
         active_ids.append(f"DOI: {parsed_doc.doi}")

@@ -4,6 +4,9 @@ from rich.console import Console
 
 from src.utils.config import *
 from src.llm.llm_adapter import LLMAdapter
+
+from .models import DEFAULT_CHAT_MODEL, REWRITE_MODEL, COMPACT_MODEL
+from .contracts import LLM_CONTRACT
 from .history import (
     user_message,
     model_message,
@@ -11,25 +14,14 @@ from .history import (
     tool_call,
     tool_response,
 )
-from .history import (
-    USER_TEXT,
-    MODEL_TEXT,
-    TOOL_CALL,
-    TOOL_RESPONSE,
-    NAME,
-    ARGS,
-    TEXT,
-    TYPE,
-    RESULT,
-)
 
 
 class ChatLLM:
     def __init__(self, console: Console, llm_adapter: LLMAdapter):
-        self._chat_model = LLM_CHAT_MODEL_DEFAULT
+        self._chat_model = DEFAULT_CHAT_MODEL
         self._context_size = LLM_CONTEXT_SIZE_DEFAULT
-        self._rewrite_model = LLM_REWRITE_MODEL
-        self._compact_model = LLM_COMPACT_MODEL
+        self._rewrite_model = REWRITE_MODEL
+        self._compact_model = COMPACT_MODEL
         self._console = console
         self._llm_adapter = llm_adapter
         self._auto_compact_enabled = False
@@ -93,19 +85,19 @@ class ChatLLM:
 
 
     def _stringify_history_chat(self, item: dict[str, Any]) -> str:
-        item_type = item[TYPE]
+        item_type = item[LLM_CONTRACT.TYPE]
 
-        if item_type == USER_TEXT:
-            return f"User: {item[TEXT]}"
+        if item_type == LLM_CONTRACT.USER_TEXT:
+            return f"User: {item[LLM_CONTRACT.TEXT]}"
 
-        if item_type == MODEL_TEXT:
-            return f"Model: {item[TEXT]}"
+        if item_type == LLM_CONTRACT.MODEL_TEXT:
+            return f"Model: {item[LLM_CONTRACT.TEXT]}"
 
-        if item_type == TOOL_CALL:
-            return f"Model: called {item[NAME]} with args {item[ARGS]}"
+        if item_type == LLM_CONTRACT.TOOL_CALL:
+            return f"Model: called {item[LLM_CONTRACT.NAME]} with args {item[LLM_CONTRACT.ARGS]}"
 
-        if item_type == TOOL_RESPONSE:
-            return f"User: tool {item[NAME]} returned {item[RESULT]}"
+        if item_type == LLM_CONTRACT.TOOL_RESPONSE:
+            return f"User: tool {item[LLM_CONTRACT.NAME]} returned {item[LLM_CONTRACT.RESULT]}"
 
         return ""
 

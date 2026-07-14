@@ -11,7 +11,7 @@ class Messages:
         if leading_blank:
             self._console.print()
 
-        self._console.print(f"{emoji} {text}")
+        self._console.print(f"{emoji}  {text}")
 
     def info(self, text: str, leading_blank: bool = True) -> None:
         self._print(MESSAGE_EMOJIS.INFO, text, leading_blank)

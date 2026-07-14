@@ -5,7 +5,6 @@ class ToolNames:
     CREATE_FILE = "create_file"
     READ_FILE = "read_file"
     INSERT_TO_FILE = "insert_to_file"
-
 TOOL_NAMES = ToolNames()
 
 
@@ -21,7 +20,6 @@ class ToolArgs:
     END_LINE = "end_line"
     INSERT_TEXT = "insert_text"
     INSERT_AFTER_LINE = "insert_after_line"
-
 TOOL_ARGS = ToolArgs()
 
 
@@ -32,5 +30,5 @@ class ToolResults:
     END_LINE = "end_line"
     CHUNK_COUNT = "chunk_count"
     DOC_COUNT = "doc_count"
-
+    RAW_CHUNKS = "raw_chunks"
 TOOL_RESULTS = ToolResults()

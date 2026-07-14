@@ -24,6 +24,23 @@ class CommandProcessor:
         self._ui = ui
 
 
+    def _resolve_subcommand(
+        self,
+        parts: list[str],
+        cmd_data: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        if len(parts) <= SUB_CMD_IDX:
+            return None, []
+
+        sub = parts[SUB_CMD_IDX]
+        subcommands = cmd_data[COMMAND_KEYS.SUBCOMMANDS]
+        sub_cmd_data = subcommands.get(sub)
+        if sub_cmd_data is None:
+            return None, []
+
+        return sub_cmd_data, parts[SUB_CMD_ARGS_START_IDX:]
+
+
     def _resolve_command(self, cmd: str) -> tuple[dict[str, Any] | None, list[str]]:
         parts = cmd.lstrip(CMD_START_CHAR).split()
         if not parts:
@@ -35,16 +52,7 @@ class CommandProcessor:
             return None, []
 
         if COMMAND_KEYS.SUBCOMMANDS in cmd_data:
-            if len(parts) <= SUB_CMD_IDX:
-                return None, []
-
-            sub = parts[SUB_CMD_IDX]
-            subcommands = cmd_data[COMMAND_KEYS.SUBCOMMANDS]
-            sub_cmd_data = subcommands.get(sub)
-            if sub_cmd_data is None:
-                return None, []
-
-            return sub_cmd_data, parts[SUB_CMD_ARGS_START_IDX:]
+            return self._resolve_subcommand(parts, cmd_data)
 
         return cmd_data, parts[BASE_CMD_ARGS_START_IDX:]
 

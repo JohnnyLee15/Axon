@@ -2,7 +2,8 @@ from rich.console import Console
 
 from src.llm.llm_adapter import LLMAdapter
 from src.llm.gemini_adapter import GeminiAdapter
-from src.utils.config import MODEL_TO_PROVIDER, GEMINI_PROVIDER
+
+from .models import MODEL_TO_PROVIDER, GEMINI_PROVIDER
 
 
 def create_llm_adapter(model: str, console: Console) -> LLMAdapter:

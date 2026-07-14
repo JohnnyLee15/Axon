@@ -1,17 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .history import (
-    USER_TEXT,
-    MODEL_TEXT,
-    TOOL_CALL,
-    TOOL_RESPONSE,
-    NAME,
-    ARGS,
-    TEXT,
-    TYPE,
-    RESULT,
-)
+from .contracts import LLM_CONTRACT
 
 
 class LLMAdapter(ABC):
@@ -116,16 +106,16 @@ class LLMAdapter(ABC):
     ) -> list[dict[str, Any]]:
         contents = []
         for item in history:
-            item_type = item[TYPE]
+            item_type = item[LLM_CONTRACT.TYPE]
 
-            if item_type == USER_TEXT:
-                contents.append(self.user_message(item[TEXT]))
-            elif item_type == MODEL_TEXT:
-                contents.append(self.model_message(item[TEXT]))
-            elif item_type == TOOL_CALL:
-                contents.append(self.tool_call_message(item[NAME], item[ARGS]))
-            elif item_type == TOOL_RESPONSE:
-                contents.append(self.tool_response_message(item[NAME], item[RESULT]))
+            if item_type == LLM_CONTRACT.USER_TEXT:
+                contents.append(self.user_message(item[LLM_CONTRACT.TEXT]))
+            elif item_type == LLM_CONTRACT.MODEL_TEXT:
+                contents.append(self.model_message(item[LLM_CONTRACT.TEXT]))
+            elif item_type == LLM_CONTRACT.TOOL_CALL:
+                contents.append(self.tool_call_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.ARGS]))
+            elif item_type == LLM_CONTRACT.TOOL_RESPONSE:
+                contents.append(self.tool_response_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.RESULT]))
             else:
                 raise ValueError(f"Unknown Axon history item type: {item_type}")
 

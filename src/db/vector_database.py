@@ -2,8 +2,7 @@ import sqlite3
 import sqlite_vec
 
 from src.utils.config import *
-from src.trackers.chunk_tracker import Chunk
-from src.trackers.document_state import ParsedDoc
+from src.ingestion.models import Chunk, ParsedDocument
 from src.utils.paper_utils import get_active_ids
 
 import json
@@ -190,7 +189,7 @@ class VectorDatabase:
             self._init_db()
 
 
-    def metadata_exists(self, parsed_doc: ParsedDoc) -> bool | None:
+    def metadata_exists(self, parsed_doc: ParsedDocument) -> bool | None:
         conn = self._get_connection()
         cursor = conn.cursor()
         sql = f"""
@@ -250,7 +249,7 @@ class VectorDatabase:
 
     def insert_paper(
         self,
-        parsed_doc: ParsedDoc,
+        parsed_doc: ParsedDocument,
         minhash_sig: bytes,
         band_hashes: list[int]
     ) -> int:

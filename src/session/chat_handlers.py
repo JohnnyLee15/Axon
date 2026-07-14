@@ -5,7 +5,7 @@ from src.llm.chat_llm import ChatLLM
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
 from src.commands.flags import OVERWRITE_CHAT_FLAG, DELETE_ALL_CHATS_FLAG
-from src.commands.choices import CONFIRM_NO, CONFIRM_YES
+from src.ui.choices import CONFIRM_NO, CONFIRM_YES
 
 CHAT_LIMIT_OPTIONS = [
     {"id": 10000, "label": "10,000 (small)"},

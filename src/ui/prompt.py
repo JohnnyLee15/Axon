@@ -37,7 +37,7 @@ class Prompt:
             event.current_buffer.insert_text("\n")
 
 
-    def _get_percentage_colour(percent_used: int) -> str:
+    def _get_percentage_colour(self, percent_used: int) -> str:
         if percent_used < CONTEXT_NOT_FULL_PERCENT:
             return ANSI_COLOURS.GREEN
 

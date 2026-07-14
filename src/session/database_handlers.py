@@ -1,8 +1,8 @@
 from src.db.vector_database import VectorDatabase
-from src.session.ingestion_runner import IngestionRunner
+from src.ingestion.ingestion_runner import IngestionRunner
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
-from src.commands.choices import CONFIRM_YES, CONFIRM_NO
+from src.ui.choices import CONFIRM_YES, CONFIRM_NO
 
 
 class DatabaseHandlers:

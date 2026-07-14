@@ -1,8 +1,5 @@
-from types import SimpleNamespace
-from typing import TypeAlias
+from .models import Block, ParsedDocument
 
-Block: TypeAlias = SimpleNamespace
-ParsedDoc: TypeAlias = SimpleNamespace
 
 class DocumentState:
     def __init__(self) -> None:
@@ -15,15 +12,14 @@ class DocumentState:
 
 
     def add_block(self, markdown: str, label: str, is_noise_risk: bool) -> None:
-        content_hash = hash(markdown)
-        if content_hash in self._seen_content:
+        if markdown in self._seen_content:
             return
 
-        self._seen_content.add(content_hash)
+        self._seen_content.add(markdown)
         self._blocks_reg[self._curr_bid] = Block(
-            markdown = markdown,
-            label = label,
-            is_noise_risk = is_noise_risk
+            markdown=markdown,
+            label=label,
+            is_noise_risk=is_noise_risk
         )
         self._curr_bid += 1
 
@@ -43,14 +39,10 @@ class DocumentState:
         self._page_one += (spacer_first + text)
 
 
-    def get_doc_state(self) -> ParsedDoc:
-        return ParsedDoc(
-            blocks_reg = self._blocks_reg,
-            full_raw_text = self._full_raw_text,
-            page_one = self._page_one,
-            title = self._title,
-            doi = None,
-            pmcid = None,
-            pmid = None,
-            arxiv = None
+    def build(self) -> ParsedDocument:
+        return ParsedDocument(
+            blocks_reg=self._blocks_reg,
+            full_raw_text=self._full_raw_text,
+            page_one=self._page_one,
+            title=self._title,
         )

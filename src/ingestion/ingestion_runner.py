@@ -3,12 +3,14 @@ from pathlib import Path
 
 from src.db.vector_database import VectorDatabase, INVALID_PAPER_ID
 from src.db.min_hasher import MinHasher
-from src.ingestion.pdf_parser import PdfParser
-from src.trackers.document_state import ParsedDoc
-from src.ingestion.semantic_chunker import SemanticChunker
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
 from src.utils.paper_utils import get_active_ids
+
+from .pdf_parser import PdfParser
+from .models import ParsedDocument
+from .semantic_chunker import SemanticChunker
+
 
 JACCARD_SIMILARITY_THRESHOLD = 0.84
 
@@ -79,7 +81,7 @@ class IngestionRunner:
         return False
 
 
-    def _is_eligible_for_processing(self, parsed_doc: ParsedDoc) -> bool:
+    def _is_eligible_for_processing(self, parsed_doc: ParsedDocument) -> bool:
         if not parsed_doc.full_raw_text:
             self._ui.warning("Could not extract valid text. Skipping.")
             return False
@@ -104,7 +106,7 @@ class IngestionRunner:
         return True
 
 
-    def _ingest_paper(self, parsed_doc: ParsedDoc) -> int:
+    def _ingest_paper(self, parsed_doc: ParsedDocument) -> int:
         sig_bytes, band_hashes = self._minhasher.minhash_doc(parsed_doc.full_raw_text)
         if sig_bytes is None or band_hashes is None:
             self._ui.warning("Document too short to fingerprint. Skipping.")
