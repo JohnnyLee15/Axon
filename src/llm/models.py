@@ -1,21 +1,32 @@
-DEFAULT_CHAT_MODEL = "gemini-2.5-flash-lite"
-REWRITE_MODEL = "gemini-2.5-flash-lite"
-COMPACT_MODEL = "gemini-2.5-flash-lite"
+GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
+GEMINI_2_5_FLASH = "gemini-2.5-flash"
+GEMINI_2_5_PRO = "gemini-2.5-pro"
+GEMINI_3_1_FLASH_LITE = "gemini-3.1-flash-lite"
+GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
+GEMINI_3_5_FLASH = "gemini-3.5-flash"
+GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
+
+DEFAULT_CHAT_MODEL = GEMINI_3_5_FLASH
+UTILITY_MODEL = GEMINI_3_5_FLASH
 
 MODEL_OPTIONS = [
-    {"id": "gemini-2.5-flash-lite", "label": "gemini-2.5-flash-lite (cheapest | quality #6)"},
-    {"id": "gemini-2.5-flash", "label": "gemini-2.5-flash (low cost | quality #5)"},
-    {"id": "gemini-3.1-flash-lite-preview", "label": "gemini-3.1-flash-lite-preview (budget | quality #4)"},
-    {"id": "gemini-3-flash-preview", "label": "gemini-3-flash-preview (mid cost | quality #3)"},
-    {"id": "gemini-2.5-pro", "label": "gemini-2.5-pro (high cost | quality #2)"},
-    {"id": "gemini-3.1-pro-preview", "label": "gemini-3.1-pro-preview (most expensive | quality #1)"},
+    {"id": GEMINI_2_5_FLASH_LITE, "label": f"{GEMINI_2_5_FLASH_LITE} (cheapest | retires Oct 2026)"},
+    {"id": GEMINI_3_1_FLASH_LITE, "label": f"{GEMINI_3_1_FLASH_LITE} (budget | stable)"},
+    {"id": GEMINI_2_5_FLASH, "label": f"{GEMINI_2_5_FLASH} (low cost | retires Oct 2026)"},
+    {"id": GEMINI_3_FLASH_PREVIEW, "label": f"{GEMINI_3_FLASH_PREVIEW} (mid cost | preview)"},
+    {"id": GEMINI_3_5_FLASH, "label": f"{GEMINI_3_5_FLASH} (recommended | stable)"},
+    {"id": GEMINI_2_5_PRO, "label": f"{GEMINI_2_5_PRO} (high cost | retires Oct 2026)"},
+    {"id": GEMINI_3_1_PRO_PREVIEW, "label": f"{GEMINI_3_1_PRO_PREVIEW} (highest cost | preview)"},
 ]
+
 GEMINI_PROVIDER = "gemini"
+
 MODEL_TO_PROVIDER = {
-    "gemini-2.5-flash-lite": GEMINI_PROVIDER,
-    "gemini-2.5-flash": GEMINI_PROVIDER,
-    "gemini-3.1-flash-lite-preview": GEMINI_PROVIDER,
-    "gemini-3-flash-preview": GEMINI_PROVIDER,
-    "gemini-2.5-pro": GEMINI_PROVIDER,
-    "gemini-3.1-pro-preview": GEMINI_PROVIDER,
+    GEMINI_2_5_FLASH_LITE: GEMINI_PROVIDER,
+    GEMINI_2_5_FLASH: GEMINI_PROVIDER,
+    GEMINI_2_5_PRO: GEMINI_PROVIDER,
+    GEMINI_3_1_FLASH_LITE: GEMINI_PROVIDER,
+    GEMINI_3_FLASH_PREVIEW: GEMINI_PROVIDER,
+    GEMINI_3_5_FLASH: GEMINI_PROVIDER,
+    GEMINI_3_1_PRO_PREVIEW: GEMINI_PROVIDER,
 }

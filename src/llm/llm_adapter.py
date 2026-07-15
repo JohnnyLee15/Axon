@@ -1,10 +1,55 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable
+
+from src.ui.axon_ui import AxonUI
 
 from .contracts import LLM_CONTRACT
+from .retry import execute_with_retries
 
 
 class LLMAdapter(ABC):
+    @abstractmethod
+    def _format_tools(
+        self,
+        tools: list[dict[str, Any]] | None,
+    ) -> Any:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _user_message(self, text: str) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _model_message(self, text: str) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _tool_call_message(
+        self,
+        name: str,
+        args: dict[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _tool_response_message(
+        self,
+        name: str,
+        result: str,
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Return whether a provider error should be retried."""
+        raise NotImplementedError
+
+
     @abstractmethod
     def count_tokens(
         self,
@@ -64,40 +109,20 @@ class LLMAdapter(ABC):
         raise NotImplementedError
 
 
-    @abstractmethod
-    def format_tools(
+    def _execute_with_retries(
         self,
-        tools: list[dict[str, Any]] | None,
+        api_func: Callable,
+        ui: AxonUI,
+        *args,
+        **kwargs
     ) -> Any:
-        raise NotImplementedError
-
-
-    @abstractmethod
-    def user_message(self, text: str) -> dict[str, Any]:
-        raise NotImplementedError
-
-
-    @abstractmethod
-    def model_message(self, text: str) -> dict[str, Any]:
-        raise NotImplementedError
-
-
-    @abstractmethod
-    def tool_call_message(
-        self,
-        name: str,
-        args: dict[str, Any],
-    ) -> dict[str, Any]:
-        raise NotImplementedError
-
-
-    @abstractmethod
-    def tool_response_message(
-        self,
-        name: str,
-        result: str,
-    ) -> dict[str, Any]:
-        raise NotImplementedError
+        return execute_with_retries(
+            api_func,
+            self._is_retryable_error,
+            ui,
+            *args,
+            **kwargs,
+        )
 
 
     def format_history(
@@ -109,15 +134,17 @@ class LLMAdapter(ABC):
             item_type = item[LLM_CONTRACT.TYPE]
 
             if item_type == LLM_CONTRACT.USER_TEXT:
-                contents.append(self.user_message(item[LLM_CONTRACT.TEXT]))
+                contents.append(self._user_message(item[LLM_CONTRACT.TEXT]))
             elif item_type == LLM_CONTRACT.MODEL_TEXT:
-                contents.append(self.model_message(item[LLM_CONTRACT.TEXT]))
+                contents.append(self._model_message(item[LLM_CONTRACT.TEXT]))
             elif item_type == LLM_CONTRACT.TOOL_CALL:
-                contents.append(self.tool_call_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.ARGS]))
+                contents.append(self._tool_call_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.ARGS]))
             elif item_type == LLM_CONTRACT.TOOL_RESPONSE:
-                contents.append(self.tool_response_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.RESULT]))
+                contents.append(self._tool_response_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.RESULT]))
             else:
                 raise ValueError(f"Unknown Axon history item type: {item_type}")
 
         return contents
+
+
 

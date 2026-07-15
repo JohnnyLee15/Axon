@@ -1,5 +1,6 @@
-from rich.console import Console
 import os
+
+from rich.console import Console
 
 from src.commands.registry import COMMANDS
 from src.commands.contracts import CommandResult, COMMAND_HANDLER_NAMES
@@ -14,7 +15,7 @@ from src.ingestion.pdf_parser import PdfParser
 from src.retrieval.factory import create_reranker
 from src.agent.agent_tools import AgentTools
 from src.llm.chat_llm import ChatLLM
-from src.llm.llm_factory import create_llm_adapter
+from src.llm.factory import create_llm_adapter
 from src.llm.models import MODEL_OPTIONS, DEFAULT_CHAT_MODEL
 
 from .chat_handlers import ChatHandlers
@@ -29,8 +30,8 @@ class SessionManager:
         self._console = Console()
         self._ui = AxonUI(self._console)
 
-        self._llm_adapter = create_llm_adapter(DEFAULT_CHAT_MODEL, self._console)
-        self._llm = ChatLLM(self._console, self._llm_adapter)
+        self._llm_adapter = create_llm_adapter(DEFAULT_CHAT_MODEL, self._ui)
+        self._llm = ChatLLM(self._ui, self._llm_adapter)
 
         self._parser = PdfParser(self._console, self._llm_adapter)
         self._chunker = SemanticChunker(self._console)
@@ -145,9 +146,9 @@ class SessionManager:
     def _select_model(self) -> None:
         selected_model = self._ui.select_option(MODEL_OPTIONS)
 
-        self._llm_adapter = create_llm_adapter(selected_model, self._console)
+        self._llm_adapter = create_llm_adapter(selected_model, self._ui)
         self._llm.set_llm_adapter(self._llm_adapter)
-        self._llm.set_chat_llm(selected_model)
+        self._llm.set_chat_model(selected_model)
 
         self._ui.info(f"Using Model: {emphasis(selected_model)}")
 

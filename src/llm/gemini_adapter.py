@@ -2,21 +2,23 @@ import os
 from typing import Any
 import json
 
-from rich.console import Console
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
-from src.utils.api_utils import execute_with_retries
-from src.utils.config import GEM_API_KEY, MAX_RETRIES
+from src.ui.axon_ui import AxonUI
 
 from .llm_adapter import LLMAdapter
 from .contracts import LLM_CONTRACT
 
+GEMINI_API_KEY_ENV_VAR = "GEM_API_KEY"
+GEMINI_RETRYABLE_STATUS_CODES = {429, 503}
+
 
 class GeminiAdapter(LLMAdapter):
-    def __init__(self, console: Console) -> None:
-        self._console = console
-        self._client = genai.Client(api_key=os.getenv(GEM_API_KEY))
+    def __init__(self, ui: AxonUI) -> None:
+        self._ui = ui
+        self._client = genai.Client(api_key=os.getenv(GEMINI_API_KEY_ENV_VAR))
 
 
     def _generate_config(
@@ -46,11 +48,66 @@ class GeminiAdapter(LLMAdapter):
                 continue
 
             for part in content.parts or []:
-                text = getattr(part, LLM_CONTRACT.TEXT, None)
+                text = getattr(part, "text", None)
                 if text:
                     text_parts.append(text)
 
         return "\n".join(text_parts).strip()
+
+
+    def _user_message(self, text: str) -> dict[str, Any]:
+        return {
+            "role": "user",
+            "parts": [{"text": text}],
+        }
+
+
+    def _model_message(self, text: str) -> dict[str, Any]:
+        return {
+            "role": "model",
+            "parts": [{"text": text}],
+        }
+
+
+    def _tool_call_message(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "role": "model",
+            "parts": [{
+                "function_call": {
+                    "name": name,
+                    "args": args,
+                },
+            }],
+        }
+
+
+    def _tool_response_message(self, name: str, result: str) -> dict[str, Any]:
+        return {
+            "role": "user",
+            "parts": [{
+                "function_response": {
+                    "name": name,
+                    "response": {"result": result},
+                },
+            }],
+        }
+
+
+    def _format_tools(
+        self,
+        tools: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
+        if not tools:
+            return None
+
+        return [{"function_declarations": tools}]
+
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        return (
+            isinstance(error, APIError)
+            and error.code in GEMINI_RETRYABLE_STATUS_CODES
+        )
 
 
     def count_tokens(
@@ -63,13 +120,12 @@ class GeminiAdapter(LLMAdapter):
         contents = self.format_history(contents)
         if system_instruction:
             contents = [
-                self.user_message(f"SYSTEM_INSTRUCTION:\n{system_instruction}")
+                self._user_message(f"SYSTEM_INSTRUCTION:\n{system_instruction}")
             ] + contents
 
-        response = execute_with_retries(
+        response = self._execute_with_retries(
             api_func=self._client.models.count_tokens,
-            console=self._console,
-            num_retries=MAX_RETRIES,
+            ui=self._ui,
             model=model,
             contents=contents,
         )
@@ -85,10 +141,9 @@ class GeminiAdapter(LLMAdapter):
         system_instruction: str | None = None,
         temperature: float = 0.0
     ) -> str:
-        response = execute_with_retries(
+        response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            console=self._console,
-            num_retries=MAX_RETRIES,
+            ui=self._ui,
             model=model,
             contents=self.format_history(contents),
             config=self._generate_config(
@@ -109,10 +164,9 @@ class GeminiAdapter(LLMAdapter):
         schema: dict[str, Any],
         temperature: float = 0.0
     ) -> dict[str, Any]:
-        response = execute_with_retries(
+        response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            console=self._console,
-            num_retries=MAX_RETRIES,
+            ui=self._ui,
             model=model,
             contents=self.format_history(contents),
             config=self._generate_config(
@@ -139,16 +193,15 @@ class GeminiAdapter(LLMAdapter):
         tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0
     ) -> dict[str, Any]:
-        response = execute_with_retries(
+        response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            console=self._console,
-            num_retries=MAX_RETRIES,
+            ui=self._ui,
             model=model,
             contents=self.format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
-                tools=self.format_tools(tools),
+                tools=self._format_tools(tools),
             ),
         )
 
@@ -164,51 +217,3 @@ class GeminiAdapter(LLMAdapter):
             LLM_CONTRACT.TOOL_CALLS: tool_calls,
             LLM_CONTRACT.RAW: response
         }
-
-
-    def user_message(self, text: str) -> dict[str, Any]:
-        return {
-            "role": "user",
-            "parts": [{"text": text}],
-        }
-
-
-    def model_message(self, text: str) -> dict[str, Any]:
-        return {
-            "role": "model",
-            "parts": [{"text": text}],
-        }
-
-
-    def tool_call_message(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "role": "model",
-            "parts": [{
-                "function_call": {
-                    "name": name,
-                    "args": args,
-                },
-            }],
-        }
-
-
-    def tool_response_message(self, name: str, result: str) -> dict[str, Any]:
-        return {
-            "role": "user",
-            "parts": [{
-                "function_response": {
-                    "name": name,
-                    "response": {"result": result},
-                },
-            }],
-        }
-
-
-    def format_tools(
-        self,
-        tools: list[dict[str, Any]] | None,
-    ) -> list[dict[str, Any]] | None:
-        if not tools:
-            return None
-
-        return [{"function_declarations": tools}]

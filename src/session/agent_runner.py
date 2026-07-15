@@ -41,8 +41,8 @@ class AgentRunner:
 
 
     def _record_tool_denial(self, tool_name: str, tool_args: dict[str, Any]) -> None:
-        self._llm.add_function_call_history(tool_name, tool_args)
-        self._llm.add_function_response_history(
+        self._llm.add_tool_call_history(tool_name, tool_args)
+        self._llm.add_tool_response_history(
             tool_name,
             (
                 f"User denied permission to execute {tool_name} this time. "
@@ -58,8 +58,8 @@ class AgentRunner:
         tool_args: dict[str, Any],
         user_input: str
     ) -> None:
-        self._llm.add_function_call_history(tool_name, tool_args)
-        self._llm.add_function_response_history(
+        self._llm.add_tool_call_history(tool_name, tool_args)
+        self._llm.add_tool_response_history(
             tool_name,
             f"User interrupted execution of {tool_name} with a new message instead."
         )
@@ -94,8 +94,8 @@ class AgentRunner:
 
 
     def _record_unavailable_tool(self, tool_name: str, tool_args: dict[str, Any]) -> None:
-        self._llm.add_function_call_history(tool_name, tool_args)
-        self._llm.add_function_response_history(
+        self._llm.add_tool_call_history(tool_name, tool_args)
+        self._llm.add_tool_response_history(
             tool_name,
             f"Tool '{tool_name}' is not available."
         )
@@ -109,8 +109,8 @@ class AgentRunner:
         self._ui.display_tool_output(tool_name, results)
 
         result_content = results[TOOL_RESULTS.CONTENT] or "No results returned"
-        self._llm.add_function_call_history(tool_name, tool_args)
-        self._llm.add_function_response_history(tool_name, result_content)
+        self._llm.add_tool_call_history(tool_name, tool_args)
+        self._llm.add_tool_response_history(tool_name, result_content)
 
         return results
 

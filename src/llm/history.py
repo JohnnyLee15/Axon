@@ -34,3 +34,28 @@ def tool_response(name: str, result: str) -> dict[str, Any]:
 
 def text_message(text: str) -> list[dict[str, Any]]:
     return [user_message(text)]
+
+
+def _stringify_history_item(item: dict[str, Any]) -> str:
+    item_type = item[LLM_CONTRACT.TYPE]
+
+    if item_type == LLM_CONTRACT.USER_TEXT:
+        return f"User: {item[LLM_CONTRACT.TEXT]}"
+
+    if item_type == LLM_CONTRACT.MODEL_TEXT:
+        return f"Model: {item[LLM_CONTRACT.TEXT]}"
+
+    if item_type == LLM_CONTRACT.TOOL_CALL:
+        return f"Model: called {item[LLM_CONTRACT.NAME]} with args {item[LLM_CONTRACT.ARGS]}"
+
+    if item_type == LLM_CONTRACT.TOOL_RESPONSE:
+        return f"User: tool {item[LLM_CONTRACT.NAME]} returned {item[LLM_CONTRACT.RESULT]}"
+
+    raise ValueError(f"Unknown history item type: {item_type}")
+
+
+def format_history_transcript(history: list[dict[str, Any]]) -> str:
+    return "\n".join(
+        _stringify_history_item(item)
+        for item in history
+    )

@@ -52,7 +52,7 @@ class AxonUI:
         return label_to_id[selected_label]
 
 
-    def listen(self, curr_tokens: int, context_size: int) -> str:
+    def listen(self, curr_tokens: int | None, context_size: int) -> str:
         return self._prompt.listen(curr_tokens, context_size)
 
 
