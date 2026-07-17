@@ -1,40 +1,85 @@
 import logging
+import warnings
+import re
 from pathlib import Path
 
-# Suppress logging
-logging.disable(logging.INFO)
-
-from docling.datamodel.base_models import DocItemLabel
+from docling.datamodel.base_models import DocItemLabel, InputFormat
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.base_models import InputFormat
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
-from rich.console import Console
+from huggingface_hub.utils import disable_progress_bars
+from transformers.utils.logging import disable_progress_bar
 
-from src.utils.config import *
 from src.utils.device_utils import get_docling_device
-from src.llm.llm_adapter import LLMAdapter
-from src.llm.history import text_message
 
 from .document_state import DocumentState
 from .models import ParsedDocument
+from .metadata_extractor import MetadataExtractor
+from .document_curator import DocumentCurator
+
+
+MAX_TINY_TEXT_CHARS = 15
+HYPHEN_WRAP_PATTERN = re.compile(r'([A-Za-z]+)-\s*\n\s*([a-z]+)')
+
+REFERENCE_HEADERS = {
+    "references",
+    "bibliography",
+    "literature cited",
+    "works cited",
+    "citations",
+    "reference list",
+    "selected bibliography"
+}
+
+
+DOCLING_LOGGER_NAMES = (
+    "docling",
+    "docling_core",
+    "docling_parse",
+    "docling_ibm_models",
+    "docling-pm",
+)
+
+EXCLUDED_DOCLING_LABELS = {
+    DocItemLabel.PAGE_HEADER,
+    DocItemLabel.PAGE_FOOTER,
+    DocItemLabel.DOCUMENT_INDEX,
+    DocItemLabel.CHECKBOX_SELECTED,
+    DocItemLabel.CHECKBOX_UNSELECTED,
+    DocItemLabel.FORM,
+    DocItemLabel.GRADING_SCALE,
+    DocItemLabel.HANDWRITTEN_TEXT,
+    DocItemLabel.REFERENCE,
+    DocItemLabel.PICTURE
+}
+DOCLING_NUM_THREADS = 8
+
+
+for logger_name in DOCLING_LOGGER_NAMES:
+    logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
+
+warnings.filterwarnings(
+    "ignore",
+    module=r"^(docling|docling_core|docling_parse|docling_ibm_models)(\.|$)",
+)
+
+disable_progress_bars()
+disable_progress_bar()
 
 
 class PdfParser:
-    """
-    Parses PDF research papers into structured text blocks by applying
-    rule-based and LLM filtering to remove academic noise.
-    """
-
-    def __init__(self, console: Console, llm_adapter: LLMAdapter) -> None:
-        self._model = LLM_CURATION_MODEL
-        self._console = console
-        self._llm_adapter = llm_adapter
+    def __init__(
+        self,
+        document_curator: DocumentCurator,
+        metadata_extractor: MetadataExtractor,
+    ) -> None:
+        self._document_curator = document_curator
+        self._metadata_extractor = metadata_extractor
 
         pipeline_opts = PdfPipelineOptions(
             do_ocr=False,
             accelerator_options=AcceleratorOptions(
-                num_threads=8,
+                num_threads=DOCLING_NUM_THREADS,
                 device=get_docling_device()
             )
         )
@@ -48,123 +93,37 @@ class PdfParser:
 
     def __call__(self, filepath: Path) -> ParsedDocument:
         doc = self._converter.convert(filepath).document
-        item_iter = iter(doc.iterate_items())
-        tracker = DocumentState()
-        processing = True
+        state = DocumentState()
 
-        while processing:
-            curr = next(item_iter, None)
-            if curr is None:
-                processing = False
-                continue
+        for item, level in doc.iterate_items():
+            if self._is_reference_header(item):
+                break
 
-            item, level = curr
-            is_reference_header = (
-                item.label.name == "SECTION_HEADER" and
-                item.text and
-                item.text.strip().lower() in REFERENCE_HEADERS
-            )
+            self._extract_block(doc, item, level, state)
 
-            if is_reference_header:
-                processing = False
-                continue
-
-            self._extract_block(doc, item, level, tracker)
-
-        parsed_doc = tracker.build()
-        self._extract_metadata(parsed_doc, filepath)
-        parsed_doc.blocks_reg = self._remove_noise_blocks(parsed_doc.blocks_reg)
+        parsed_doc = state.build()
+        self._metadata_extractor.extract(parsed_doc, filepath)
+        parsed_doc.blocks_reg = self._document_curator.curate(parsed_doc.blocks_reg)
         return parsed_doc
 
 
-    def _extract_pdf_ids(self, parsed_doc: ParsedDocument, filepath: Path) -> None:
-        flat_text = parsed_doc.page_one.replace("\n", " ").strip()
-
-        doi_match = DOI_PATTERN.search(flat_text)
-        if doi_match:
-            parsed_doc.doi = doi_match.group(0).rstrip(".,;:")
-
-        pmcid_match = PMCID_PATTERN.search(flat_text)
-        if pmcid_match:
-            parsed_doc.pmcid = pmcid_match.group(1).upper()
-        else:
-            pmcid_match_file = PMCID_FILENAME_PATTERN.search(filepath.stem)
-            if pmcid_match_file:
-                parsed_doc.pmcid = pmcid_match_file.group(1).upper()
-
-        arxiv_match = ARXIV_PATTERN.search(flat_text)
-        if arxiv_match:
-            parsed_doc.arxiv = arxiv_match.group(1)
-        else:
-            arxiv_match_file = ARXIV_FILENAME_PATTERN.search(filepath.stem)
-            if arxiv_match_file:
-                parsed_doc.arxiv = arxiv_match_file.group(1)
-
-        pmid_match = PMID_PATTERN.search(flat_text)
-        if pmid_match:
-            parsed_doc.pmid = pmid_match.group(1)
-
-    def _extract_metadata(self, parsed_doc: ParsedDocument, filepath: Path) -> None:
-        self._extract_pdf_ids(parsed_doc, filepath)
-
-        if not parsed_doc.title:
-            try:
-                self._console.print("[bold]🤖 Triggering LLM Title Extractor Fallback[/bold]")
-                prompt = f"<first_page_text>\n{parsed_doc.page_one}\n</first_page_text>"
-
-                parsed_args = self._llm_adapter.generate_json(
-                    model=self._model,
-                    contents=text_message(prompt),
-                    system_instruction=TITLE_PROMPT,
-                    schema=TITLE_SCHEMA,
-                    temperature=LLM_METADATA_MODEL_TEMPERATURE,
-                )
-
-                self._console.print("[bold]✅ LLM Title Extractor responded successfully with tool arguments[/bold]")
-
-                llm_title = parsed_args.get("title")
-                if isinstance(llm_title, str):
-                    llm_title = llm_title.strip()
-                    if llm_title and llm_title.lower() != "null":
-                        parsed_doc.title = llm_title.lstrip("#").strip()
-
-            except Exception as e:
-                self._console.print(f"[bold red]❌ LLM Metadata Fallback Error:[/bold red] {e}")
-
-        if not parsed_doc.title:
-            parsed_doc.title = filepath.stem.replace("-", " ").replace("_", " ").strip()
+    def _is_reference_header(self, item: NodeItem) -> bool:
+        return (
+            item.label == DocItemLabel.SECTION_HEADER and
+            item.text.strip().lower() in REFERENCE_HEADERS
+        )
 
 
-    def _is_potentially_noise(self, text: str) -> bool:
-        text_lower = text.strip().lower()
-
-        # Strip markdown formatting
-        clean_text = text_lower.replace('#', '').strip()
-        if clean_text in SCIENTIFIC_HEADERS:
-            return False
-
-        for pattern in NOISE_REGEX_PATTERNS:
-            if pattern.search(text_lower):
-                return True
-
-        words = text_lower.split()
-        if len(words) <= MIN_WORD_COUNT_THRESHOLD:
-            return True
-
-        return False
-
-    def _extract_item_with_text_attr(self, item: NodeItem, level: int) -> str:
+    def _format_item_text(self, item: NodeItem, level: int) -> str:
         if not item.text:
             return ""
+
         text = item.text.strip()
-
-        # Fix hyphenation across lines
         text = HYPHEN_WRAP_PATTERN.sub(r'\1\2', text)
-
-        # Apply markdown formatting based on the label
         if item.label == DocItemLabel.SECTION_HEADER:
             return f"{'#' * max(1, level)} {text}"
-        elif item.label == DocItemLabel.LIST_ITEM:
+
+        if item.label == DocItemLabel.LIST_ITEM:
             return f"* {text}"
 
         return text
@@ -179,9 +138,47 @@ class PdfParser:
             return item.export_to_markdown(doc=doc).strip()
 
         if hasattr(item, "text"):
-            return self._extract_item_with_text_attr(item, level)
+            return self._format_item_text(item, level)
 
         return ""
+
+
+    def _record_document_text(
+        self,
+        state: DocumentState,
+        item: NodeItem,
+        markdown: str,
+    ) -> None:
+        state.add_to_full_raw_text(markdown)
+
+        provenance = getattr(item, "prov", [])
+        page_no = provenance[0].page_no if provenance else None
+        if page_no != 1:
+            return
+
+        state.add_to_first_page(markdown)
+        if item.label == DocItemLabel.TITLE:
+            title = markdown.lstrip("#").strip()
+            state.set_title_if_missing(title)
+
+
+    def _should_exclude_block(
+        self,
+        item: NodeItem,
+        markdown: str,
+    ) -> bool:
+        if item.label in EXCLUDED_DOCLING_LABELS:
+            return True
+
+        is_tiny_text = (
+            item.label == DocItemLabel.TEXT and
+            item.text and
+            len(item.text) <= MAX_TINY_TEXT_CHARS
+        )
+        if is_tiny_text:
+            return True
+
+        return not any(char.isalnum() for char in markdown)
 
 
     def _extract_block(
@@ -189,83 +186,20 @@ class PdfParser:
         doc: DoclingDocument,
         item: NodeItem,
         level: int,
-        tracker: DocumentState
-    ):
+        state: DocumentState
+    ) -> None:
         markdown = self._extract_block_text(doc, item, level)
         if not markdown:
             return
 
-        tracker.add_to_full_raw_text(markdown)
+        self._record_document_text(state, item, markdown)
 
-        # Get page number of item from first prov only
-        page_no = item.prov[0].page_no if hasattr(item, "prov") and item.prov else None
-        if page_no == 1:
-            tracker.add_to_first_page(markdown)
+        if self._should_exclude_block(item, markdown):
+            return
 
-            if item.label.name == "TITLE":
-                title = markdown.lstrip("#").strip()
-                tracker.set_title_if_missing(title)
-
-        if item.label in EXCLUDED_DOCLING_LABELS:
-            return None
-
-        is_tiny_text = (
-            item.label.name == "TEXT" and
-            hasattr(item, "text") and
-            item.text and
-            len(item.text) <= MIN_CHAR_COUNT
+        state.add_block(
+            markdown,
+            item.label.name,
+            self._document_curator.is_potentially_noise(markdown)
         )
-        if is_tiny_text:
-            return None
 
-        # Ensure text contains numbers or letters
-        if not any(char.isalnum() for char in markdown):
-            return None
-
-        tracker.add_block(markdown, item.label.name, self._is_potentially_noise(markdown))
-
-
-    def _get_noise_blocks(self, batch_text: str) -> list[int]:
-        formatted_prompt = f"<input_blocks>\n{batch_text}\n</input_blocks>"
-
-        try:
-            self._console.print("[bold]🤖 Triggering LLM Curation[/bold]")
-
-            parsed_args = self._llm_adapter.generate_json(
-                model=self._model,
-                contents=text_message(formatted_prompt),
-                system_instruction=LLM_CURATION_PROMPT,
-                schema=CURATION_TOOL,
-                temperature=LLM_CURATION_MODEL_TEMPERATURE,
-            )
-
-            self._console.print("[bold]✅ Curation LLM responded successfully with tool arguments[/bold]")
-            return parsed_args.get("noise_block_ids", [])
-
-        except Exception as e:
-            # Return empty list to prevent pipeline crashes on API timeouts or malformed JSON
-            self._console.print(f"[bold red]❌ Curation LLM API Error: {e}[/bold red]")
-            return []
-
-    def _remove_noise_blocks(self, blocks_reg: dict) -> dict:
-        noise_risk_bids = [b for b in blocks_reg if blocks_reg[b].is_noise_risk]
-        if not noise_risk_bids:
-            return blocks_reg
-
-        current_batch_text = ""
-        bids_to_remove = []
-        for bid in noise_risk_bids:
-            block_text = blocks_reg[bid].markdown
-            entry = f"<block id='{bid}'>\n{block_text}\n</block>\n"
-
-            if current_batch_text and len(current_batch_text) + len(entry) > LLM_CURATION_BATCH_CHAR_LIMIT:
-                bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
-                current_batch_text = ""
-
-            current_batch_text += entry
-
-        # Catch the final, partially-filled batch
-        if current_batch_text:
-            bids_to_remove.extend(self._get_noise_blocks(current_batch_text))
-
-        return {b: blocks_reg[b] for b in blocks_reg if b not in bids_to_remove}

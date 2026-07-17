@@ -12,6 +12,8 @@ from src.ui.formatters import emphasis
 from src.ingestion.ingestion_runner import IngestionRunner
 from src.ingestion.semantic_chunker import SemanticChunker
 from src.ingestion.pdf_parser import PdfParser
+from src.ingestion.document_curator import DocumentCurator
+from src.ingestion.metadata_extractor import MetadataExtractor
 from src.retrieval.factory import create_reranker
 from src.agent.agent_tools import AgentTools
 from src.llm.chat_llm import ChatLLM
@@ -33,7 +35,9 @@ class SessionManager:
         self._llm_adapter = create_llm_adapter(DEFAULT_CHAT_MODEL, self._ui)
         self._llm = ChatLLM(self._ui, self._llm_adapter)
 
-        self._parser = PdfParser(self._console, self._llm_adapter)
+        self._metadata_extractor = MetadataExtractor(self._ui, self._llm_adapter)
+        self._document_curator = DocumentCurator(self._ui, self._llm_adapter)
+        self._parser = PdfParser(self._document_curator, self._metadata_extractor)
         self._chunker = SemanticChunker(self._console)
         self._db = VectorDatabase(self._console)
         self._minhasher = MinHasher()
