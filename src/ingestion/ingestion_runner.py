@@ -10,6 +10,7 @@ from src.utils.paper_utils import get_active_ids
 from .pdf_parser import PdfParser
 from .models import ParsedDocument
 from .semantic_chunker import SemanticChunker
+from .embedding_backend import EmbeddingBackend
 
 
 JACCARD_SIMILARITY_THRESHOLD = 0.84
@@ -20,12 +21,14 @@ class IngestionRunner:
         self,
         parser: PdfParser,
         chunker: SemanticChunker,
+        embedding_backend: EmbeddingBackend,
         db: VectorDatabase,
         minhasher: MinHasher,
         ui: AxonUI,
     ) -> None:
         self._parser = parser
         self._chunker = chunker
+        self._embedding_backend = embedding_backend
         self._db = db
         self._minhasher = minhasher
         self._ui = ui
@@ -136,6 +139,7 @@ class IngestionRunner:
 
         self._ui.progress("Generating semantic chunks and embeddings")
         chunks = self._chunker(parsed_doc.blocks_reg)
+        self._embedding_backend.embed_chunks(chunks)
         self._ui.success(f"Successfully generated {emphasis(len(chunks))} chunks.")
         self._db.insert_paper_chunks(chunks, pid)
 

@@ -14,6 +14,7 @@ from src.ingestion.semantic_chunker import SemanticChunker
 from src.ingestion.pdf_parser import PdfParser
 from src.ingestion.document_curator import DocumentCurator
 from src.ingestion.metadata_extractor import MetadataExtractor
+from src.ingestion.torch_embedding_backend import TorchEmbeddingBackend
 from src.retrieval.factory import create_reranker
 from src.agent.agent_tools import AgentTools
 from src.llm.chat_llm import ChatLLM
@@ -38,7 +39,8 @@ class SessionManager:
         self._metadata_extractor = MetadataExtractor(self._ui, self._llm_adapter)
         self._document_curator = DocumentCurator(self._ui, self._llm_adapter)
         self._parser = PdfParser(self._document_curator, self._metadata_extractor)
-        self._chunker = SemanticChunker(self._console)
+        self._chunker = SemanticChunker()
+        self._embedding_backend = TorchEmbeddingBackend()
         self._db = VectorDatabase(self._console)
         self._minhasher = MinHasher()
 
@@ -51,7 +53,7 @@ class SessionManager:
 
     def _init_session_components(self) -> None:
         self._agent_tools = AgentTools(
-            chunker=self._chunker,
+            embedding_backend=self._embedding_backend,
             db=self._db,
             reranker=self._reranker,
         )
@@ -59,6 +61,7 @@ class SessionManager:
         self._ingestion_runner = IngestionRunner(
             parser=self._parser,
             chunker=self._chunker,
+            embedding_backend=self._embedding_backend,
             db=self._db,
             minhasher=self._minhasher,
             ui=self._ui,

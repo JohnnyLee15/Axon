@@ -1,5 +1,5 @@
 from src.utils.config import *
-from src.ingestion.semantic_chunker import SemanticChunker
+from src.ingestion.embedding_backend import EmbeddingBackend
 from src.db.vector_database import VectorDatabase
 from src.retrieval.reranker import Reranker
 from src.utils.file_utils import get_path_relative_to_project_root
@@ -14,11 +14,11 @@ import difflib
 class AgentTools:
     def __init__(
         self,
-        chunker: SemanticChunker,
+        embedding_backend: EmbeddingBackend,
         db: VectorDatabase,
         reranker: Reranker
     ):
-        self._chunker = chunker
+        self._embedding_backend = embedding_backend
         self._db = db
         self._reranker = reranker
 
@@ -57,7 +57,7 @@ class AgentTools:
         self,
         query: str
     ) -> dict:
-        embedding = self._chunker.embed_query(query)
+        embedding = self._embedding_backend.embed_query(query)
         chunks = self._db.top_chunk_matches(query, embedding)
         best_chunks = self._reranker.rank_chunks(query, chunks)
         formatted_chunks = self._format_chunks(best_chunks)
