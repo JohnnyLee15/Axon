@@ -28,6 +28,7 @@ LSH_TABLE = "lsh"
 FTS_TABLE = "fts"
 INITIAL_CHUNK_K = 20
 REPLACE_WHITESPACE_WITH_SPACE = re.compile(r'\s+')
+EMBEDDING_DIM = 1024
 
 # ------ MinHasher Constants ------
 LSH_BANDS = 16

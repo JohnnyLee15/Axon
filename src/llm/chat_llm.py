@@ -4,7 +4,7 @@ from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis, dim
 
 from .llm_adapter import LLMAdapter
-from .models import DEFAULT_CHAT_MODEL, UTILITY_MODEL
+from .models import DEFAULT_CHAT_MODEL, CHAT_UTILITY_MODEL
 from .prompts import AXON_SYSTEM_PROMPT, REWRITE_SYSTEM_PROMPT, COMPACT_SYSTEM_PROMPT
 from .settings import (
     DEFAULT_CONTEXT_SIZE,
@@ -29,7 +29,7 @@ class ChatLLM:
     def __init__(self, ui: AxonUI, llm_adapter: LLMAdapter):
         self._chat_model = DEFAULT_CHAT_MODEL
         self._context_size = DEFAULT_CONTEXT_SIZE
-        self._utility_model = UTILITY_MODEL
+        self._utility_model = CHAT_UTILITY_MODEL
         self._ui = ui
         self._llm_adapter = llm_adapter
         self._auto_compact_enabled = False
