@@ -22,7 +22,7 @@ class CommandHandlerNames:
     CHAT_ROLL = "chat_roll"
 
     LOAD_PDFS = "load_pdfs"
-    CLEAR_DB = "clear_db"
+    CLEAR_LIBRARY = "clear_library"
 
     CLEAR_SCREEN = "clear_screen"
     SELECT_MODEL = "select_model"

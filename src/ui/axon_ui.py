@@ -15,9 +15,9 @@ OPTION_LABEL_KEY = "label"
 
 
 class AxonUI:
-    def __init__(self, console: Console):
+    def __init__(self):
         # TODO add a name to the database
-        self._console = console
+        self._console = Console()
         self._prompt = Prompt(self._console)
         self._tool_renderers = ToolRenderers(self._console)
         self._views = Views(self._console)

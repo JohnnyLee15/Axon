@@ -1,7 +1,9 @@
 import time
 from pathlib import Path
+import sqlite3
 
-from src.db.vector_database import VectorDatabase, INVALID_PAPER_ID
+from src.db.paper_repository import PaperRepository
+from src.db.chunk_repository import ChunkRepository
 from src.db.min_hasher import MinHasher
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
@@ -22,14 +24,16 @@ class IngestionRunner:
         parser: PdfParser,
         chunker: SemanticChunker,
         embedding_backend: EmbeddingBackend,
-        db: VectorDatabase,
+        chunk_repository: ChunkRepository,
+        paper_repository: PaperRepository,
         minhasher: MinHasher,
         ui: AxonUI,
     ) -> None:
         self._parser = parser
         self._chunker = chunker
         self._embedding_backend = embedding_backend
-        self._db = db
+        self._chunk_repository = chunk_repository
+        self._paper_repository = paper_repository
         self._minhasher = minhasher
         self._ui = ui
 
@@ -97,9 +101,7 @@ class IngestionRunner:
         ):
             return True
 
-        exists = self._db.metadata_exists(parsed_doc)
-        if exists is None:
-            return False
+        exists = self._paper_repository.metadata_exists(parsed_doc)
 
         if exists:
             id_str = get_active_ids(parsed_doc)
@@ -109,21 +111,19 @@ class IngestionRunner:
         return True
 
 
-    def _ingest_paper(self, parsed_doc: ParsedDocument) -> int:
-        sig_bytes, band_hashes = self._minhasher.minhash_doc(parsed_doc.full_raw_text)
-        if sig_bytes is None or band_hashes is None:
+    def _ingest_paper(self, parsed_doc: ParsedDocument) -> int | None:
+        fingerprint = self._minhasher.create_fingerprint(parsed_doc.full_raw_text)
+        if fingerprint is None:
             self._ui.warning("Document too short to fingerprint. Skipping.")
-            return INVALID_PAPER_ID
+            return
 
-        lsh_cands = self._db.get_lsh_candidates(band_hashes)
-        if lsh_cands is None:
-            return INVALID_PAPER_ID
-
-        is_duplicate = self._compare_min_hashes(sig_bytes, lsh_cands)
+        signature, band_hashes = fingerprint
+        lsh_cands = self._paper_repository.get_lsh_candidates(band_hashes)
+        is_duplicate = self._compare_min_hashes(signature, lsh_cands)
         if is_duplicate:
-            return INVALID_PAPER_ID
+            return
 
-        pid = self._db.insert_paper(parsed_doc, sig_bytes, band_hashes)
+        pid = self._paper_repository.insert_paper(parsed_doc, signature, band_hashes)
         return pid
 
 
@@ -134,14 +134,14 @@ class IngestionRunner:
             return
 
         pid = self._ingest_paper(parsed_doc)
-        if pid == INVALID_PAPER_ID:
+        if pid is None:
             return
 
         self._ui.progress("Generating semantic chunks and embeddings")
         chunks = self._chunker(parsed_doc.blocks_reg)
         self._embedding_backend.embed_chunks(chunks)
         self._ui.success(f"Successfully generated {emphasis(len(chunks))} chunks.")
-        self._db.insert_paper_chunks(chunks, pid)
+        self._chunk_repository.insert_chunks(chunks, pid)
 
         return pid
 
@@ -149,7 +149,13 @@ class IngestionRunner:
     def _load_pdf(self, pdf_path: Path) -> None:
         self._ui.display_section(pdf_path.name)
         start_time = time.perf_counter()
-        pid = self._process_pdf(pdf_path)
+
+        try:
+            pid = self._process_pdf(pdf_path)
+        except sqlite3.Error as e:
+            self._ui.error(f"Database error ingesting \"{emphasis(pdf_path.name)}\": {e}")
+            return
+
         if pid is None:
             return
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.utils.config import *
+from .paths import ROOT_DIR
 
 DEFAULT_EXT = "text"
 
@@ -21,4 +21,3 @@ def get_path_relative_to_project_root(path: str | Path) -> Path | None:
 def get_file_ext(path: str) -> str:
     suffix = Path(path).suffix
     return suffix if suffix else DEFAULT_EXT
-

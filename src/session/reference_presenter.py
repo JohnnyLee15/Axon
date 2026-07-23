@@ -1,10 +1,12 @@
-from src.db.vector_database import VectorDatabase
+import sqlite3
+
+from src.db.paper_repository import PaperRepository
 from src.ui.axon_ui import AxonUI
 
 
 class ReferencePresenter:
-    def __init__(self, db: VectorDatabase, ui: AxonUI) -> None:
-        self._db = db
+    def __init__(self, paper_repository: PaperRepository, ui: AxonUI) -> None:
+        self._paper_repository = paper_repository
         self._ui = ui
 
 
@@ -13,7 +15,13 @@ class ReferencePresenter:
             return
 
         paper_ids = {chunk["paper_id"] for chunk in chunks.values()}
-        paper_properties = self._db.get_paper_metadata_by_id(list(paper_ids))
+
+        try:
+            paper_properties = self._paper_repository.get_metadata_by_ids(list(paper_ids))
+        except sqlite3.Error as e:
+            self._ui.error(f"Could not retrieve paper references: {e}")
+            return
+
         if not paper_properties:
             return
 

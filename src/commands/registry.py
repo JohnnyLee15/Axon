@@ -58,18 +58,18 @@ CHAT_COMMANDS = {
     }
 }
 
-DB_COMMANDS = {
+LIBRARY_COMMANDS = {
     "load": {
-        COMMAND_KEYS.USAGE: "/db load <file path>",
+        COMMAND_KEYS.USAGE: "/library load <file path>",
         COMMAND_KEYS.DESC: "Loads a file or folder (and subfolders) of PDFs into the database.",
         COMMAND_KEYS.ARGC: 1,
         COMMAND_KEYS.HANDLER: "load_pdfs"
     },
     "clear": {
-        COMMAND_KEYS.USAGE: "/db clear",
-        COMMAND_KEYS.DESC: "Remove all data from the database.",
+        COMMAND_KEYS.USAGE: "/library clear",
+        COMMAND_KEYS.DESC: "Removes all papers from the database.",
         COMMAND_KEYS.ARGC: 0,
-        COMMAND_KEYS.HANDLER: "clear_db"
+        COMMAND_KEYS.HANDLER: "clear_library"
     }
 }
 
@@ -77,8 +77,8 @@ COMMANDS = {
     "chat": {
         COMMAND_KEYS.SUBCOMMANDS: CHAT_COMMANDS
     },
-    "db": {
-        COMMAND_KEYS.SUBCOMMANDS: DB_COMMANDS
+    "library": {
+        COMMAND_KEYS.SUBCOMMANDS: LIBRARY_COMMANDS
     },
     "clear": {
         COMMAND_KEYS.USAGE: "/clear",

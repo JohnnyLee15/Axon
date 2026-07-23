@@ -15,6 +15,7 @@ from pylatexenc.latex2text import LatexNodes2Text
 
 from .theme import ANSI_COLOURS, theme_colour, STYLES
 
+
 CONTEXT_NOT_FULL_PERCENT = 65
 CONTEXT_NEAR_FULL_PERCENT = 90
 UNKNOWN_CONTEXT_USAGE_DISPLAY = "?"

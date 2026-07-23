@@ -1,11 +1,12 @@
 import sqlite3
 
-from src.db.vector_database import VectorDatabase
+from src.db.chat_repository import ChatRepository
 from src.llm.chat_llm import ChatLLM
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
 from src.commands.flags import OVERWRITE_CHAT_FLAG, DELETE_ALL_CHATS_FLAG
 from src.ui.choices import CONFIRM_NO, CONFIRM_YES
+
 
 CHAT_LIMIT_OPTIONS = [
     {"id": 10000, "label": "10,000 (small)"},
@@ -20,11 +21,11 @@ CHAT_LIMIT_OPTIONS = [
 class ChatHandlers:
     def __init__(
         self,
-        db: VectorDatabase,
+        chat_repository: ChatRepository,
         llm: ChatLLM,
         ui: AxonUI
     ) -> None:
-        self._db = db
+        self._chat_repository = chat_repository
         self._llm = llm
         self._ui = ui
 
@@ -44,20 +45,29 @@ class ChatHandlers:
                 return
 
         try:
-            self._db.insert_chat(name, self._llm.get_history(), overwrite)
-            self._ui.success(f"Chat saved as \"{emphasis(name)}\"!")
-
+            self._chat_repository.insert_chat(name, self._llm.get_history(), overwrite)
         except sqlite3.IntegrityError:
             overwrite_cmd = f"/chat save {name} {OVERWRITE_CHAT_FLAG}"
             self._ui.warning(
                 f"Chat \"{emphasis(name)}\" already exists! No chats saved. "
                 f"Use {emphasis(overwrite_cmd)} to overwrite."
             )
+            return
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not save chat: {error}")
+            return
+
+        self._ui.success(f"Chat saved as \"{emphasis(name)}\"!")
 
 
     def load_chat(self, name: str) -> None:
         name = name.strip()
-        history = self._db.get_chat(name)
+
+        try:
+            history = self._chat_repository.get_chat(name)
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not load chat: {error}")
+            return
 
         if history is None:
             self._ui.warning(f"Chat \"{emphasis(name)}\" not found. No chats loaded.")
@@ -73,39 +83,60 @@ class ChatHandlers:
 
 
     def list_chats(self) -> None:
-        chat_names = self._db.get_all_chat_names()
-        if chat_names is None:
+        try:
+            chat_names = self._chat_repository.get_all_chat_names()
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not retrieve saved chats: {error}")
             return
 
         self._ui.display_chat_names(chat_names)
+
+
+    def _delete_all_chats(self) -> None:
+        self._ui.warning("This will permanently delete ALL saved chats.")
+        confirm_options = f"{CONFIRM_YES}/{CONFIRM_NO}"
+        confirm = self._ui.confirm(f"Are you sure? ({emphasis(confirm_options)}): ")
+
+        if confirm.strip().lower() != CONFIRM_YES:
+            self._ui.info("Deletion canceled.")
+            return
+
+        try:
+            self._chat_repository.delete_all_chats()
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not delete saved chats: {error}")
+            return
+
+        self._ui.success("All saved chats have been deleted!")
+
+
+    def _delete_single_chat(self, chat_name: str) -> None:
+        try:
+            deleted = self._chat_repository.delete_chat(chat_name)
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not delete chat: {error}")
+            return
+
+        if deleted:
+            self._ui.success(f"Chat \"{emphasis(chat_name)}\" deleted successfully!")
+            return
+
+        self._ui.warning(f"Chat \"{emphasis(chat_name)}\" not found.")
 
 
     def delete_chat(self, arg: str) -> None:
         arg = arg.strip()
 
         if arg == DELETE_ALL_CHATS_FLAG:
-            self._ui.warning("This will permanently delete ALL saved chats.")
-            confirm_options = f"{CONFIRM_YES}/{CONFIRM_NO}"
-            confirm = self._ui.confirm(f"Are you sure? ({emphasis(confirm_options)}): ")
+            self._delete_all_chats()
+            return
 
-            if confirm.strip().lower() == CONFIRM_YES:
-                success = self._db.delete_all_chats()
-                if success:
-                    self._ui.success("All saved chats have been deleted!")
-            else:
-                self._ui.info("Deletion canceled.")
-
-        else:
-            success = self._db.delete_chat(arg)
-            if success:
-                self._ui.success(f"Chat \"{emphasis(arg)}\" deleted successfully!")
-            else:
-                self._ui.warning(f"Chat \"{emphasis(arg)}\" not found.")
+        self._delete_single_chat(arg)
 
 
     def chat_roll(self) -> None:
-        bool_val = self._llm.toggle_chat_roll()
-        status = "on" if bool_val else "off"
+        enabled = self._llm.toggle_chat_roll()
+        status = "on" if enabled else "off"
         self._ui.info(f"Chat rolling successfully toggled {emphasis(status)}!")
 
 
@@ -116,8 +147,8 @@ class ChatHandlers:
 
 
     def auto_compact(self) -> None:
-        bool_val = self._llm.toggle_auto_compact()
-        status = "on" if bool_val else "off"
+        enabled = self._llm.toggle_auto_compact()
+        status = "on" if enabled else "off"
         self._ui.info(f"Auto-compact successfully toggled {emphasis(status)}!")
 
 

@@ -1,3 +1,5 @@
+from typing import Any
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -52,6 +54,28 @@ class Views:
         self._console.print(table)
 
 
+    def _partition_commands(
+        self,
+        commands: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        base_commands = []
+        command_groups = []
+        for command in commands.values():
+            subcommands = command.get(COMMAND_KEYS.SUBCOMMANDS)
+
+            if subcommands is None:
+                base_commands.append(command)
+            else:
+                command_groups.append(subcommands)
+
+        return base_commands, command_groups
+
+
+    def _add_help_rows(self, table: Table, commands: list[dict]) -> None:
+        for cmd in commands:
+            table.add_row(cmd[COMMAND_KEYS.USAGE], cmd[COMMAND_KEYS.DESC])
+
+
     def display_help(self, commands: dict) -> None:
         table = Table(
             title=panel_title(VIEW_EMOJIS.COMMAND_MENU, "Axon Command Menu"),
@@ -63,26 +87,12 @@ class Views:
         table.add_column("Command", style=STYLES.EMPHASIS)
         table.add_column("Description")
 
-        base_cmds = []
-        grouped_cmds = {}
+        base_cmds, cmd_groups = self._partition_commands(commands)
+        self._add_help_rows(table, base_cmds)
 
-        for cmd in commands:
-            item = commands[cmd]
-            if COMMAND_KEYS.SUBCOMMANDS in item:
-                grouped_cmds[cmd] = item[COMMAND_KEYS.SUBCOMMANDS]
-            else:
-                base_cmds.append(item)
-
-        for cmd in base_cmds:
-            table.add_row(cmd[COMMAND_KEYS.USAGE], cmd[COMMAND_KEYS.DESC])
-
-        for cmd in grouped_cmds:
-            sub_cmds = grouped_cmds[cmd]
+        for sub_cmds in cmd_groups:
             table.add_section()
-
-            for sub_cmd in sub_cmds:
-                props = sub_cmds[sub_cmd]
-                table.add_row(props[COMMAND_KEYS.USAGE], props[COMMAND_KEYS.DESC])
+            self._add_help_rows(table, list(sub_cmds.values()))
 
         self._console.print()
         self._console.print(table)
