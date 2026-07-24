@@ -70,10 +70,10 @@ class MetadataExtractor:
         if not document_page_one:
             return
 
-        try:
-            self._ui.progress("Triggering LLM Title Extractor Fallback.")
-            prompt = f"<first_page_text>\n{document_page_one}\n</first_page_text>"
+        self._ui.progress("Triggering LLM Title Extractor Fallback.")
+        prompt = f"<first_page_text>\n{document_page_one}\n</first_page_text>"
 
+        try:
             parsed_args = self._llm_adapter.generate_json(
                 model=self._model,
                 contents=text_message(prompt),
@@ -81,22 +81,20 @@ class MetadataExtractor:
                 schema=TITLE_EXTRACTION_SCHEMA,
                 temperature=TITLE_EXTRACTION_TEMPERATURE,
             )
-
-            title = parsed_args.get("title")
-            if not isinstance(title, str):
-                return None
-
-            title = " ".join(title.strip().lstrip("#").split())
-            if not title or title.lower() == "null":
-                return None
-
-            self._ui.success("Document title extracted successfully.")
-            return title
-
         except Exception as e:
             self._ui.error(f"LLM title extraction failed: {e}.")
+            return None
 
-        return None
+        title = parsed_args.get("title")
+        if not isinstance(title, str):
+            return None
+
+        title = " ".join(title.strip().lstrip("#").split())
+        if not title or title.lower() == "null":
+            return None
+
+        self._ui.success("Document title extracted successfully.")
+        return title
 
 
     def extract(self, parsed_doc: ParsedDocument, filepath: Path) -> None:

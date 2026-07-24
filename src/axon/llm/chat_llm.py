@@ -161,15 +161,13 @@ class ChatLLM:
                 system_instruction=AXON_SYSTEM_PROMPT,
                 temperature=CHAT_TEMPERATURE,
             )
-
-            self.add_user_history(user_input)
-            self.add_model_history(response)
-            return response
-
         except Exception as e:
             self._ui.error(f"Generation Error: {e}.")
+            return None
 
-        return None
+        self.add_user_history(user_input)
+        self.add_model_history(response)
+        return response
 
 
     def query_agent(self, tools: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -181,18 +179,18 @@ class ChatLLM:
             return None
 
         try:
-            return self._llm_adapter.generate_with_tools(
+            response = self._llm_adapter.generate_with_tools(
                 model=self._chat_model,
                 contents=self._history,
                 system_instruction=AXON_SYSTEM_PROMPT,
                 tools=tools,
                 temperature=CHAT_TEMPERATURE,
             )
-
         except Exception as e:
             self._ui.error(f"Generation Error: {e}.")
+            return None
 
-        return None
+        return response
 
 
     def compact(self) -> str | None:
@@ -214,14 +212,12 @@ class ChatLLM:
                 system_instruction=COMPACT_SYSTEM_PROMPT,
                 temperature=COMPACT_TEMPERATURE,
             )
-
-            self._history = text_message(response)
-            return response
-
         except Exception as e:
             self._ui.error(f"Compaction Error: {e}.")
+            return None
 
-        return None
+        self._history = text_message(response)
+        return response
 
 
     def get_token_count(self, history: list[dict[str, Any]] | None = None) -> int | None:
@@ -229,16 +225,16 @@ class ChatLLM:
             history = self._history
 
         try:
-            return self._llm_adapter.count_tokens(
+            token_count = self._llm_adapter.count_tokens(
                 model=self._chat_model,
                 contents=history,
                 system_instruction=AXON_SYSTEM_PROMPT,
             )
-
         except Exception as e:
             self._ui.error(f"Error calculating token count: {e}.")
+            return None
 
-        return None
+        return token_count
 
 
     def rewrite_query(self, query: str) -> str:
@@ -250,12 +246,13 @@ class ChatLLM:
         )
 
         try:
-            return self._llm_adapter.generate_text(
+            rewritten_query = self._llm_adapter.generate_text(
                 model=self._utility_model,
                 contents=text_message(user_contents),
                 system_instruction=REWRITE_SYSTEM_PROMPT,
                 temperature=REWRITE_TEMPERATURE,
             )
-
         except Exception:
             return query
+
+        return rewritten_query

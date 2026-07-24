@@ -96,12 +96,11 @@ class DocumentCurator:
                 schema=BLOCK_CURATION_SCHEMA,
                 temperature=BLOCK_CURATION_TEMPERATURE,
             )
-
-            return response[NOISE_BLOCK_IDS_KEY]
-
         except Exception as e:
             self._ui.error(f"Curation LLM API Error: {e}.")
             return []
+
+        return response[NOISE_BLOCK_IDS_KEY]
 
 
     def curate(self, blocks_reg: dict[int, Block]) -> dict[int, Block]:
