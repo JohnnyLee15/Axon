@@ -1,4 +1,5 @@
 from typing import Any
+import os
 
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -13,7 +14,7 @@ from .formatters import panel_title, emphasis
 
 
 SYNTAX_DIFF = "diff"
-SYNTAX_BASH = "bash"
+SYNTAX_SHELL = "batch" if os.name == "nt" else "shell"
 UNKNOWN_PATH_STR = "Unknown Path"
 EOF_STR = "EOF"
 
@@ -26,18 +27,18 @@ class ToolRenderers:
 
     def _init_renderers(self) -> None:
         self._tool_renderers = {
-            TOOL_NAMES.SEARCH_FOR_CHUNKS: self._render_result_rag_search,
+            TOOL_NAMES.SEARCH_LIBRARY: self._render_result_rag_search,
             TOOL_NAMES.REPLACE_IN_FILE: self._render_result_replace_in_file,
-            TOOL_NAMES.EXECUTE_BASH_CMD: self._render_result_bash,
+            TOOL_NAMES.EXECUTE_SHELL_CMD: self._render_result_shell,
             TOOL_NAMES.CREATE_FILE: self._render_result_create_file,
             TOOL_NAMES.READ_FILE: self._render_result_read_file,
             TOOL_NAMES.INSERT_TO_FILE: self._render_result_insert_to_file
         }
 
         self._arg_renderers = {
-            TOOL_NAMES.SEARCH_FOR_CHUNKS: self._render_args_rag,
+            TOOL_NAMES.SEARCH_LIBRARY: self._render_args_rag,
             TOOL_NAMES.REPLACE_IN_FILE: self._render_args_replace_in_file,
-            TOOL_NAMES.EXECUTE_BASH_CMD: self._render_args_bash,
+            TOOL_NAMES.EXECUTE_SHELL_CMD: self._render_args_shell,
             TOOL_NAMES.CREATE_FILE: self._render_args_create_file,
             TOOL_NAMES.READ_FILE: self._render_args_read_file,
             TOOL_NAMES.INSERT_TO_FILE: self._render_args_insert_to_file
@@ -62,9 +63,9 @@ class ToolRenderers:
             self._console.print(Panel(output, title=panel_title(MESSAGE_EMOJIS.WARNING, "Edit Status")))
 
 
-    def _render_result_bash(self, results: dict[str, Any]) -> None:
+    def _render_result_shell(self, results: dict[str, Any]) -> None:
         output = results[TOOL_RESULTS.CONTENT]
-        syntax = Syntax(output, SYNTAX_BASH, theme=SYNTAX_THEME, word_wrap=True)
+        syntax = Syntax(output, SYNTAX_SHELL, theme=SYNTAX_THEME, word_wrap=True)
         self._console.print(Panel(syntax, title=panel_title(AXON_TOOL_EMOJIS.TERMINAL, "Terminal Output")))
 
 
@@ -97,15 +98,31 @@ class ToolRenderers:
     def _render_result_read_file(self, results: dict[str, Any]) -> None:
         start_line = results.get(TOOL_RESULTS.START_LINE, None)
         end_line = results.get(TOOL_RESULTS.END_LINE, None)
+        truncated = results.get(TOOL_RESULTS.TRUNCATED, False)
 
         if start_line is None or end_line is None:
-            self._console.print(Panel(results[TOOL_RESULTS.CONTENT], title=panel_title(MESSAGE_EMOJIS.WARNING, "Error Reading File")))
+            self._console.print(
+                Panel(
+                    results[TOOL_RESULTS.CONTENT],
+                    title=panel_title(MESSAGE_EMOJIS.WARNING, "Error Reading File"),
+                )
+            )
             return
 
-        self._console.print(Panel(
-            f"{MESSAGE_EMOJIS.SUCCESS} Successfully read lines {emphasis(start_line)} to {emphasis(end_line)} into memory.",
-            title=panel_title(AXON_TOOL_EMOJIS.FILE, "File Read")
-        ))
+        success_title = panel_title(AXON_TOOL_EMOJIS.FILE, "File Read")
+
+        if end_line == 0:
+            self._console.print(Panel(results[TOOL_RESULTS.CONTENT], title=success_title))
+            return
+
+        message = (
+            f"{MESSAGE_EMOJIS.SUCCESS} Successfully read lines "
+            f"{emphasis(start_line)} to {emphasis(end_line)} into memory."
+        )
+        if truncated:
+            message += " Output was truncated."
+
+        self._console.print(Panel(message, title=success_title))
 
 
     def _render_result_insert_to_file(self, results: dict[str, Any]) -> None:
@@ -125,9 +142,9 @@ class ToolRenderers:
         renderer(results)
 
 
-    def _render_args_bash(self, args: dict) -> None:
+    def _render_args_shell(self, args: dict) -> None:
         cmd = args.get(TOOL_ARGS.CMD, "")
-        syntax = Syntax(cmd, SYNTAX_BASH, theme=SYNTAX_THEME, word_wrap=True)
+        syntax = Syntax(cmd, SYNTAX_SHELL, theme=SYNTAX_THEME, word_wrap=True)
         self._console.print(Panel(syntax, title=panel_title(AXON_TOOL_EMOJIS.RUN, "Axon is Running")))
 
 

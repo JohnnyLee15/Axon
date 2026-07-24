@@ -1,7 +1,7 @@
 from .tool_contracts import TOOL_ARGS, TOOL_NAMES
 
-SEARCH_FOR_CHUNKS_SCHEMA = {
-    "name": TOOL_NAMES.SEARCH_FOR_CHUNKS,
+SEARCH_LIBRARY_SCHEMA = {
+    "name": TOOL_NAMES.SEARCH_LIBRARY,
     "description": (
         "Search Axon's scientific paper database for relevant excerpts when you need more information to answer the user."
     ),
@@ -17,10 +17,10 @@ SEARCH_FOR_CHUNKS_SCHEMA = {
     }
 }
 
-EXECUTE_BASH_CMD_SCHEMA = {
-    "name": TOOL_NAMES.EXECUTE_BASH_CMD,
+EXECUTE_SHELL_CMD_SCHEMA = {
+    "name": TOOL_NAMES.EXECUTE_SHELL_CMD,
     "description": (
-        "Execute a bash command exactly as it should be typed in a terminal. "
+        "Execute a shell command exactly as it should be typed in a terminal. "
         "Do not add backslashes before ordinary single or double quotes unless the shell command itself requires them."
     ),
     "parameters": {
@@ -28,7 +28,7 @@ EXECUTE_BASH_CMD_SCHEMA = {
         "properties": {
             TOOL_ARGS.CMD: {
                 "type": "string",
-                "description": "The exact bash command to execute as a raw, unescaped bash string."
+                "description": "The exact shell command to execute as a raw, unescaped shell string."
             }
         },
         "required": [TOOL_ARGS.CMD]
@@ -153,8 +153,8 @@ INSERT_TO_FILE_SCHEMA = {
 }
 
 TOOL_SCHEMAS = [
-    SEARCH_FOR_CHUNKS_SCHEMA,
-    EXECUTE_BASH_CMD_SCHEMA,
+    SEARCH_LIBRARY_SCHEMA,
+    EXECUTE_SHELL_CMD_SCHEMA,
     CREATE_FILE_SCHEMA,
     REPLACE_IN_FILE_SCHEMA,
     READ_FILE_SCHEMA,

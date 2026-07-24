@@ -42,6 +42,10 @@ class AxonUI:
         self._views.display_section(title)
 
 
+    def clear_screen(self) -> None:
+        self._console.clear()
+
+
     def select_option(self, options: list[dict[str, Any]]) -> str:
         labels = [option[OPTION_LABEL_KEY] for option in options]
         label_to_id = {

@@ -1,3 +1,5 @@
+from src.db.contracts import CHUNK_FIELDS
+
 from .backend import RerankerBackend
 
 
@@ -19,7 +21,7 @@ class Reranker:
             return {}
 
         cids = [cid for cid in chunks]
-        docs = [chunks[cid]["text"] for cid in chunks]
+        docs = [chunks[cid][CHUNK_FIELDS.TEXT] for cid in chunks]
 
         scored = []
         for i in range(0, len(docs), RERANK_BATCH_SIZE):

@@ -1,7 +1,7 @@
 class ToolNames:
-    SEARCH_FOR_CHUNKS = "search_for_chunks"
+    SEARCH_LIBRARY = "search_library"
     REPLACE_IN_FILE = "replace_in_file"
-    EXECUTE_BASH_CMD = "execute_bash_cmd"
+    EXECUTE_SHELL_CMD = "execute_shell_cmd"
     CREATE_FILE = "create_file"
     READ_FILE = "read_file"
     INSERT_TO_FILE = "insert_to_file"
@@ -31,4 +31,5 @@ class ToolResults:
     CHUNK_COUNT = "chunk_count"
     DOC_COUNT = "doc_count"
     RAW_CHUNKS = "raw_chunks"
+    TRUNCATED = "truncated"
 TOOL_RESULTS = ToolResults()

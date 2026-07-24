@@ -3,17 +3,22 @@ from .paths import ROOT_DIR
 
 DEFAULT_EXT = "text"
 
+
+def resolve_filepath(path: str) -> Path:
+    path = path.strip()
+    if not path:
+        raise ValueError("File path cannot be empty.")
+
+    return Path(path).expanduser().resolve()
+
+
 def get_path_relative_to_project_root(path: str | Path) -> Path | None:
-    filepath = path
-    if not isinstance(path, Path):
-        try:
-            filepath = Path(path.strip()).expanduser().resolve()
-        except Exception:
-            return None
 
     try:
-        display_path = filepath.relative_to(ROOT_DIR)
-        return display_path
+        filepath = path if isinstance(path, Path) else resolve_filepath(path)
+        return filepath.relative_to(ROOT_DIR)
+    except ValueError:
+        return None
     except Exception:
         return filepath
 

@@ -1,13 +1,20 @@
 from typing import Any
 
 from src.llm.chat_llm import ChatLLM
-from src.ui.axon_ui import AxonUI
-from src.agent.agent_tools import AgentTools
-from src.agent.tool_contracts import TOOL_NAMES, TOOL_RESULTS
 from src.llm.contracts import LLM_CONTRACT
-from src.agent.tool_schemas import TOOL_SCHEMAS
+from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
 from src.ui.choices import CONFIRM_NO, CONFIRM_TRUST, CONFIRM_YES
+from src.agent.tool_contracts import TOOL_NAMES, TOOL_RESULTS
+from src.agent.tool_schemas import TOOL_SCHEMAS
+from src.agent.shell_tools import execute_shell_cmd
+from src.agent.library_search_tool import LibrarySearchTool
+from src.agent.file_tools import (
+    create_file,
+    insert_to_file,
+    read_file,
+    replace_in_file,
+)
 
 from .reference_presenter import ReferencePresenter
 
@@ -16,12 +23,12 @@ class AgentRunner:
     def __init__(
         self,
         llm: ChatLLM,
-        agent_tools: AgentTools,
+        library_search_tool: LibrarySearchTool,
         ui: AxonUI,
         reference_presenter: ReferencePresenter,
     ) -> None:
         self._llm = llm
-        self._agent_tools = agent_tools
+        self._library_search_tool = library_search_tool
         self._ui = ui
         self._reference_presenter = reference_presenter
 
@@ -31,12 +38,12 @@ class AgentRunner:
     def _init_tools(self) -> None:
         self._trusted_tools = set()
         self._tool_functions = {
-            TOOL_NAMES.SEARCH_FOR_CHUNKS: self._agent_tools.search_for_chunks,
-            TOOL_NAMES.EXECUTE_BASH_CMD: self._agent_tools.execute_bash_cmd,
-            TOOL_NAMES.CREATE_FILE: self._agent_tools.create_file,
-            TOOL_NAMES.REPLACE_IN_FILE: self._agent_tools.replace_in_file,
-            TOOL_NAMES.READ_FILE: self._agent_tools.read_file,
-            TOOL_NAMES.INSERT_TO_FILE: self._agent_tools.insert_to_file
+            TOOL_NAMES.SEARCH_LIBRARY: self._library_search_tool.search_library,
+            TOOL_NAMES.EXECUTE_SHELL_CMD: execute_shell_cmd,
+            TOOL_NAMES.CREATE_FILE: create_file,
+            TOOL_NAMES.REPLACE_IN_FILE: replace_in_file,
+            TOOL_NAMES.READ_FILE: read_file,
+            TOOL_NAMES.INSERT_TO_FILE: insert_to_file,
         }
 
 

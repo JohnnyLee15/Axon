@@ -5,6 +5,7 @@ from src.ingestion.models import Chunk
 
 from .sqlite_database import SQLiteDatabase
 from .schema_manager import VEC_TABLE, CHUNK_TABLE, FTS_TABLE
+from .contracts import CHUNK_FIELDS
 
 
 INITIAL_CHUNK_K = 20
@@ -120,16 +121,16 @@ class ChunkRepository:
         chunks = {}
         for cid, pid, cidx, text in bm25_chunks:
             chunks[cid] = {
-                "paper_id": pid,
-                "chunk_index": cidx,
-                "text": text
+                CHUNK_FIELDS.PAPER_ID: pid,
+                CHUNK_FIELDS.CHUNK_INDEX: cidx,
+                CHUNK_FIELDS.TEXT: text,
             }
 
         for cid, pid, cidx, text in vector_chunks:
             chunks[cid] = {
-                "paper_id": pid,
-                "chunk_index": cidx,
-                "text": text
+                CHUNK_FIELDS.PAPER_ID: pid,
+                CHUNK_FIELDS.CHUNK_INDEX: cidx,
+                CHUNK_FIELDS.TEXT: text,
             }
 
         return chunks

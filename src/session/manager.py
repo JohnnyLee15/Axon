@@ -1,5 +1,3 @@
-import os
-
 from dotenv import load_dotenv
 
 from src.commands.registry import COMMANDS
@@ -25,7 +23,7 @@ from src.ingestion.torch_embedding_backend import TorchEmbeddingBackend
 
 from src.retrieval.factory import create_reranker
 
-from src.agent.agent_tools import AgentTools
+from src.agent.library_search_tool import LibrarySearchTool
 
 from src.utils.paths import ENV_PATH
 
@@ -89,7 +87,7 @@ class SessionManager:
     def _init_session_services(self) -> None:
         self._reranker = create_reranker()
 
-        self._agent_tools = AgentTools(
+        self._library_search_tool = LibrarySearchTool(
             embedding_backend=self._embedding_backend,
             chunk_repository=self._chunk_repository,
             reranker=self._reranker,
@@ -115,13 +113,13 @@ class SessionManager:
         self._query_runner = QueryRunner(
             llm=self._llm,
             ui=self._ui,
-            agent_tools=self._agent_tools,
+            library_search_tool=self._library_search_tool,
             reference_presenter=self._reference_presenter,
         )
 
         self._agent_runner = AgentRunner(
             llm=self._llm,
-            agent_tools=self._agent_tools,
+            library_search_tool=self._library_search_tool,
             ui=self._ui,
             reference_presenter=self._reference_presenter,
         )
@@ -164,7 +162,7 @@ class SessionManager:
 
 
     def _clear_screen(self) -> None:
-        os.system("cls" if os.name == "nt" else "clear")
+        self._ui.clear_screen()
 
 
     def _exit(self) -> CommandResult:

@@ -1,6 +1,7 @@
 import sqlite3
 
 from src.db.paper_repository import PaperRepository
+from src.db.contracts import CHUNK_FIELDS
 from src.ui.axon_ui import AxonUI
 
 
@@ -14,7 +15,7 @@ class ReferencePresenter:
         if not chunks:
             return
 
-        paper_ids = {chunk["paper_id"] for chunk in chunks.values()}
+        paper_ids = {chunk[CHUNK_FIELDS.PAPER_ID] for chunk in chunks.values()}
 
         try:
             paper_properties = self._paper_repository.get_metadata_by_ids(list(paper_ids))
