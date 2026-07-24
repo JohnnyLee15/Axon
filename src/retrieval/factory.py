@@ -1,4 +1,4 @@
-from src.utils.device_utils import get_torch_device
+from src.utils.device import get_torch_device
 
 from .mlx_backend import MLXRerankerBackend
 from .torch_backend import TorchRerankerBackend

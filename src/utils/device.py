@@ -1,5 +1,4 @@
 import torch
-from docling.datamodel.pipeline_options import AcceleratorDevice
 
 
 def get_torch_device() -> torch.device:
@@ -10,16 +9,6 @@ def get_torch_device() -> torch.device:
     if torch.xpu.is_available():
         return torch.device("xpu")
     return torch.device("cpu")
-
-
-def get_docling_device() -> AcceleratorDevice:
-    if torch.cuda.is_available():
-        return AcceleratorDevice.CUDA
-    if torch.mps.is_available():
-        return AcceleratorDevice.MPS
-    if torch.xpu.is_available():
-        return AcceleratorDevice.XPU
-    return AcceleratorDevice.CPU
 
 
 def get_dtype() -> torch.dtype:

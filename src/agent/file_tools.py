@@ -1,7 +1,7 @@
 from pathlib import Path
 import difflib
 
-from src.utils.file_utils import get_path_relative_to_project_root, resolve_filepath
+from src.utils.file_system import get_path_relative_to_project_root, resolve_filepath
 
 from .tool_contracts import TOOL_RESULTS, TOOL_NAMES, TOOL_ARGS
 

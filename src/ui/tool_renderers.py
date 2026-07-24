@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
 
-from src.utils.file_utils import get_path_relative_to_project_root, get_file_ext
+from src.utils.file_system import get_path_relative_to_project_root, get_file_ext
 from src.agent.tool_contracts import TOOL_ARGS, TOOL_NAMES, TOOL_RESULTS
 
 from .theme import AXON_TOOL_EMOJIS, MESSAGE_EMOJIS, SYNTAX_THEME

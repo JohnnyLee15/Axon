@@ -38,7 +38,7 @@ from transformers.tokenization_utils_base import BatchEncoding
 disable_progress_bars()
 disable_progress_bar()
 
-from src.utils.device_utils import get_dtype, get_torch_device
+from src.utils.device import get_dtype, get_torch_device
 
 from .embedding_backend import EmbeddingBackend
 from .context_buffer_tracker import ContextBufferTracker

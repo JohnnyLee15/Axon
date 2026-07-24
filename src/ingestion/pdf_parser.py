@@ -3,14 +3,14 @@ import warnings
 import re
 from pathlib import Path
 
+import torch
+from docling.datamodel.pipeline_options import AcceleratorDevice
 from docling.datamodel.base_models import DocItemLabel, InputFormat
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc import DoclingDocument, NodeItem, TableItem
 from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
 from huggingface_hub.utils import disable_progress_bars
 from transformers.utils.logging import disable_progress_bar
-
-from src.utils.device_utils import get_docling_device
 
 from .document_state import DocumentState
 from .models import ParsedDocument
@@ -80,7 +80,7 @@ class PdfParser:
             do_ocr=False,
             accelerator_options=AcceleratorOptions(
                 num_threads=DOCLING_NUM_THREADS,
-                device=get_docling_device()
+                device=self._get_docling_device()
             )
         )
 
@@ -89,6 +89,16 @@ class PdfParser:
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_opts)
             }
         )
+
+
+    def _get_docling_device(self) -> AcceleratorDevice:
+        if torch.cuda.is_available():
+            return AcceleratorDevice.CUDA
+        if torch.mps.is_available():
+            return AcceleratorDevice.MPS
+        if torch.xpu.is_available():
+            return AcceleratorDevice.XPU
+        return AcceleratorDevice.CPU
 
 
     def __call__(self, filepath: Path) -> ParsedDocument:

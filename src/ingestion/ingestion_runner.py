@@ -7,7 +7,6 @@ from src.db.chunk_repository import ChunkRepository
 from src.db.min_hasher import MinHasher
 from src.ui.axon_ui import AxonUI
 from src.ui.formatters import emphasis
-from src.utils.paper_utils import get_active_ids
 
 from .pdf_parser import PdfParser
 from .models import ParsedDocument
@@ -44,6 +43,23 @@ class IngestionRunner:
         seconds = int(elapsed_time % 60)
         milliseconds = int((elapsed_time * 1000) % 1000)
         return f"{minutes:02d}m {seconds:02d}s {milliseconds:03d}ms"
+
+
+    def _format_active_identifiers(self, parsed_doc: ParsedDocument) -> str:
+        active_ids = []
+        if parsed_doc.doi:
+            active_ids.append(f"DOI: {parsed_doc.doi}")
+
+        if parsed_doc.arxiv:
+            active_ids.append(f"arXiv: {parsed_doc.arxiv}")
+
+        if parsed_doc.pmcid:
+            active_ids.append(f"PMCID: {parsed_doc.pmcid}")
+
+        if parsed_doc.pmid:
+            active_ids.append(f"PMID: {parsed_doc.pmid}")
+
+        return  ", ".join(active_ids) if active_ids else "Unknown identifiers"
 
 
     def _get_pdf_filepaths(self, filepath: Path) -> list[Path]:
@@ -104,7 +120,7 @@ class IngestionRunner:
         exists = self._paper_repository.metadata_exists(parsed_doc)
 
         if exists:
-            id_str = get_active_ids(parsed_doc)
+            id_str = self._format_active_identifiers(parsed_doc)
             self._ui.warning(f"Duplicate metadata detected ({emphasis(id_str)}). Skipping.")
             return False
 

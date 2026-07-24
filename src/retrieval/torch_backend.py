@@ -5,7 +5,7 @@ from huggingface_hub import snapshot_download
 from transformers import AutoModel
 
 from .backend import RerankerBackend
-from src.utils.device_utils import get_dtype
+from src.utils.device import get_dtype
 
 
 TORCH_RERANKER_MODEL = "jinaai/jina-reranker-v3"
