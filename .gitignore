@@ -9,3 +9,6 @@ data/
 **/*.zsh
 axon.pptx
 docs/
+*.egg-info/
+build/
+dist/

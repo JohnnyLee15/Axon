@@ -27,16 +27,24 @@ warnings.filterwarnings(
         r"tokenizers|safetensors)(\.|$)"
     ),
 )
+warnings.filterwarnings(
+    "ignore",
+    message=r"Already found a `peft_config` attribute.*",
+    category=UserWarning,
+    module=r"peft\.tuners\.tuners_utils",
+)
+
 
 
 import torch
 from huggingface_hub.utils import disable_progress_bars
 from transformers import AutoModel, AutoTokenizer
-from transformers.utils.logging import disable_progress_bar
+from transformers.utils.logging import disable_progress_bar, set_verbosity_error
 from transformers.tokenization_utils_base import BatchEncoding
 
 disable_progress_bars()
 disable_progress_bar()
+set_verbosity_error()
 
 from axon.utils.device import get_dtype, get_torch_device
 
@@ -48,14 +56,20 @@ from .models import Chunk
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3-hf"
 MAX_QUERY_TOKENS = 8192
 MAX_CONTEXT_TOKENS = 2048
-PASSAGE_EMBEDDING_TASK = "retrieval.passage"
-QUERY_EMBEDDING_TASK = "retrieval.query"
+PASSAGE_EMBEDDING_ADAPTER = "retrieval_passage"
+QUERY_EMBEDDING_ADAPTER = "retrieval_query"
+EMBEDDING_ADAPTERS = (
+    PASSAGE_EMBEDDING_ADAPTER,
+    QUERY_EMBEDDING_ADAPTER,
+)
 
 
 class TorchEmbeddingBackend(EmbeddingBackend):
     def __init__(self) -> None:
         self._device = get_torch_device()
+
         self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=get_dtype())
+        self._load_adapters()
         self._model.to(self._device)
         self._model.eval()
 
@@ -69,6 +83,15 @@ class TorchEmbeddingBackend(EmbeddingBackend):
             return_token_type_ids=False,
         )
         return len(tokens["input_ids"])
+
+
+    def _load_adapters(self) -> None:
+        for adapter_name in EMBEDDING_ADAPTERS:
+            self._model.load_adapter(
+                EMBEDDING_MODEL,
+                adapter_name=adapter_name,
+                adapter_kwargs={"subfolder": adapter_name},
+            )
 
 
     def _build_context_buffers(
@@ -95,16 +118,17 @@ class TorchEmbeddingBackend(EmbeddingBackend):
     def _encode_tokens(
         self,
         tokens: BatchEncoding,
-        task: str
+        adapter_name: str
     ) -> torch.Tensor:
         token_ids = tokens["input_ids"].to(self._device)
         attention_mask = tokens["attention_mask"].to(self._device)
+
+        self._model.set_adapter(adapter_name)
 
         with torch.no_grad():
             output = self._model(
                 input_ids=token_ids,
                 attention_mask=attention_mask,
-                task=task
             )
 
         return output.last_hidden_state[0]
@@ -123,7 +147,7 @@ class TorchEmbeddingBackend(EmbeddingBackend):
         raw_offsets = tokens["offset_mapping"][0].tolist()
         offsets = [(start, end) for start, end in raw_offsets]
 
-        enriched_tokens = self._encode_tokens(tokens, PASSAGE_EMBEDDING_TASK)
+        enriched_tokens = self._encode_tokens(tokens, PASSAGE_EMBEDDING_ADAPTER)
         return enriched_tokens, offsets
 
 
@@ -241,10 +265,7 @@ class TorchEmbeddingBackend(EmbeddingBackend):
             truncation=True
         )
 
-        enriched_tokens = self._encode_tokens(
-            tokens,
-            QUERY_EMBEDDING_TASK,
-        )
+        enriched_tokens = self._encode_tokens(tokens, QUERY_EMBEDDING_ADAPTER)
 
         embedding = torch.mean(
             enriched_tokens,

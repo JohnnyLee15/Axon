@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "axon-ai-agent"
+version = "0.1.0"
+description = "A local, extensible AI agent for research, knowledge retrieval, and software development."
+requires-python = ">=3.12"
+license = "Apache-2.0"
+
+dependencies = [
+    "torch>=2.11,<3",
+    "transformers>=5.5,<6",
+    "peft>=0.18,<0.19",
+    "huggingface-hub>=1.11,<2",
+
+    "docling>=2.86,<3",
+    "docling-core>=2.73,<3",
+    "pysbd>=0.3.4,<0.4",
+
+    "sqlite-vec>=0.1.9,<0.2",
+    "datasketch>=1.9,<2",
+    "xxhash>=3.6,<4",
+    "numpy>=2.4,<3",
+
+    "rich>=14.3,<15",
+    "prompt-toolkit>=3.0.52,<4",
+    "google-genai>=2.10,<3",
+    "pylatexenc>=2.10,<3",
+    "python-dotenv>=1.2,<2",
+
+    "mlx>=0.31,<0.32; platform_system == 'Darwin' and platform_machine == 'arm64'",
+    "mlx-lm>=0.31,<0.32; platform_system == 'Darwin' and platform_machine == 'arm64'",
+]
+
+
+[project.urls]
+Repository = "https://github.com/JohnnyLee15/Axon"
+
+
+[project.scripts]
+axon = "axon.__main__:main"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["axon*"]
