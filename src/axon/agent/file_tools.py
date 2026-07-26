@@ -1,7 +1,7 @@
 from pathlib import Path
 import difflib
 
-from axon.utils.file_system import get_path_relative_to_project_root, resolve_filepath
+from axon.utils.file_system import get_path_relative_to_current_dir, resolve_filepath
 
 from .tool_contracts import TOOL_RESULTS, TOOL_NAMES, TOOL_ARGS
 
@@ -39,7 +39,7 @@ def create_file(path: str, content: str) -> dict:
 
 
 def _create_diff(filepath: Path, old_content: str, new_content: str) -> str:
-    display_path = get_path_relative_to_project_root(filepath)
+    display_path = get_path_relative_to_current_dir(filepath)
 
     diff = difflib.unified_diff(
         old_content.splitlines(keepends=True),

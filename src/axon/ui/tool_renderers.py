@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
 
-from axon.utils.file_system import get_path_relative_to_project_root, get_file_ext
+from axon.utils.file_system import get_path_relative_to_current_dir, get_file_ext
 from axon.agent.tool_contracts import TOOL_ARGS, TOOL_NAMES, TOOL_RESULTS
 
 from .theme import AXON_TOOL_EMOJIS, MESSAGE_EMOJIS, SYNTAX_THEME
@@ -46,7 +46,7 @@ class ToolRenderers:
 
 
     def _get_display_str_and_ext(self, filepath: str) -> tuple[str, str]:
-        display_path = get_path_relative_to_project_root(filepath)
+        display_path = get_path_relative_to_current_dir(filepath)
         display_str = str(display_path) if display_path else filepath
         ext = get_file_ext(display_str)
         return display_str, ext

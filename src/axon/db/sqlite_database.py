@@ -5,7 +5,7 @@ from pathlib import Path
 
 import sqlite_vec
 
-from axon.utils.paths import DATA_DIR
+from axon.config.paths import DATA_DIR
 
 
 DB_PATH = DATA_DIR / "axon.db"

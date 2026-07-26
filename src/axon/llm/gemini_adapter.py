@@ -1,4 +1,3 @@
-import os
 from typing import Any
 import json
 
@@ -11,14 +10,14 @@ from axon.ui.axon_ui import AxonUI
 from .llm_adapter import LLMAdapter
 from .contracts import LLM_CONTRACT
 
-GEMINI_API_KEY_ENV_VAR = "GEM_API_KEY"
+
 GEMINI_RETRYABLE_STATUS_CODES = {429, 503}
 
 
 class GeminiAdapter(LLMAdapter):
-    def __init__(self, ui: AxonUI) -> None:
+    def __init__(self, ui: AxonUI, api_key: str) -> None:
         self._ui = ui
-        self._client = genai.Client(api_key=os.getenv(GEMINI_API_KEY_ENV_VAR))
+        self._client = genai.Client(api_key=api_key)
 
 
     def _generate_config(
@@ -35,7 +34,7 @@ class GeminiAdapter(LLMAdapter):
             temperature=temperature,
             response_mime_type=response_mime_type,
             response_schema=response_schema,
-            tools=tools
+            tools=tools,
         )
 
 
@@ -115,7 +114,7 @@ class GeminiAdapter(LLMAdapter):
         *,
         model: str,
         contents: list[dict[str, Any]],
-        system_instruction: str | None = None
+        system_instruction: str | None = None,
     ) -> int:
         contents = self.format_history(contents)
         if system_instruction:
@@ -139,7 +138,7 @@ class GeminiAdapter(LLMAdapter):
         model: str,
         contents: list[dict[str, Any]],
         system_instruction: str | None = None,
-        temperature: float = 0.0
+        temperature: float = 0.0,
     ) -> str:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
@@ -162,7 +161,7 @@ class GeminiAdapter(LLMAdapter):
         contents: list[dict[str, Any]],
         system_instruction: str,
         schema: dict[str, Any],
-        temperature: float = 0.0
+        temperature: float = 0.0,
     ) -> dict[str, Any]:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
@@ -191,7 +190,7 @@ class GeminiAdapter(LLMAdapter):
         contents: list[dict[str, Any]],
         system_instruction: str | None = None,
         tools: list[dict[str, Any]] | None = None,
-        temperature: float = 0.0
+        temperature: float = 0.0,
     ) -> dict[str, Any]:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
@@ -209,11 +208,11 @@ class GeminiAdapter(LLMAdapter):
         for call in response.function_calls or []:
             tool_calls.append({
                 LLM_CONTRACT.NAME: call.name,
-                LLM_CONTRACT.ARGS: dict(call.args)
+                LLM_CONTRACT.ARGS: dict(call.args),
             })
 
         return {
             LLM_CONTRACT.TEXT: self._extract_text(response),
             LLM_CONTRACT.TOOL_CALLS: tool_calls,
-            LLM_CONTRACT.RAW: response
+            LLM_CONTRACT.RAW: response,
         }

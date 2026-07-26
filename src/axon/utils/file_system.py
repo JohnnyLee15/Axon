@@ -1,5 +1,5 @@
 from pathlib import Path
-from .paths import ROOT_DIR
+
 
 DEFAULT_EXT = "text"
 
@@ -13,14 +13,14 @@ def resolve_filepath(path: str | Path) -> Path:
     return Path(path).expanduser().resolve()
 
 
-def get_path_relative_to_project_root(path: str | Path) -> Path | None:
+def get_path_relative_to_current_dir(path: str | Path) -> Path | None:
     try:
         filepath = resolve_filepath(path)
     except (ValueError, TypeError):
         return None
 
     try:
-        return filepath.relative_to(ROOT_DIR)
+        return filepath.relative_to(Path.cwd().resolve())
     except ValueError:
         return filepath
 

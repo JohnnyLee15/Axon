@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-
 from axon.commands.registry import COMMANDS
 from axon.commands.contracts import CommandResult, COMMAND_HANDLER_NAMES
 from axon.commands.processor import CommandProcessor
@@ -25,7 +23,9 @@ from axon.retrieval.factory import create_reranker
 
 from axon.agent.library_search_tool import LibrarySearchTool
 
-from axon.utils.paths import ENV_PATH
+from axon.config.credential_store import CredentialStore
+
+from axon.config.paths import ENV_PATH
 
 from axon.llm.chat_llm import ChatLLM
 from axon.llm.factory import create_llm_adapter
@@ -40,8 +40,8 @@ from .reference_presenter import ReferencePresenter
 
 class SessionManager:
     def __init__(self):
-        load_dotenv(ENV_PATH)
         self._ui = AxonUI()
+        self._credentials = CredentialStore(ENV_PATH)
         self._agent_mode_enabled = False
 
         self._init_database()
@@ -63,7 +63,11 @@ class SessionManager:
 
 
     def _init_llm(self) -> None:
-        self._llm_adapter = create_llm_adapter(DEFAULT_CHAT_MODEL, self._ui)
+        self._llm_adapter = create_llm_adapter(
+            DEFAULT_CHAT_MODEL,
+            self._ui,
+            self._credentials,
+        )
         self._llm = ChatLLM(self._ui, self._llm_adapter)
 
 
@@ -179,7 +183,11 @@ class SessionManager:
     def _select_model(self) -> None:
         selected_model = self._ui.select_option(MODEL_OPTIONS)
 
-        self._llm_adapter = create_llm_adapter(selected_model, self._ui)
+        self._llm_adapter = create_llm_adapter(
+            selected_model,
+            self._ui,
+            self._credentials,
+        )
         self._llm.set_llm_adapter(self._llm_adapter)
         self._llm.set_chat_model(selected_model)
 
