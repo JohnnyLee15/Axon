@@ -5,7 +5,6 @@ axon_venv
 __pycache__
 data/
 **/*.txt
-!requirements.txt
 **/*.zsh
 axon.pptx
 docs/
