@@ -11,12 +11,16 @@ from .llm_adapter import LLMAdapter
 from .contracts import LLM_CONTRACT
 
 
-GEMINI_RETRYABLE_STATUS_CODES = {429, 503}
+RETRYABLE_STATUS_CODES = {429, 503}
+
+INVALID_API_KEY_REASON = "API_KEY_INVALID"
+UNAUTHORIZED_STATUS_CODE = 401
 
 
 class GeminiAdapter(LLMAdapter):
     def __init__(self, ui: AxonUI, api_key: str) -> None:
-        self._ui = ui
+        super().__init__(ui=ui)
+
         self._client = genai.Client(api_key=api_key)
 
 
@@ -105,8 +109,38 @@ class GeminiAdapter(LLMAdapter):
     def _is_retryable_error(self, error: Exception) -> bool:
         return (
             isinstance(error, APIError)
-            and error.code in GEMINI_RETRYABLE_STATUS_CODES
+            and error.code in RETRYABLE_STATUS_CODES
         )
+
+
+    def _is_invalid_api_key_error(self, error: Exception) -> bool:
+        if not isinstance(error, APIError):
+            return False
+
+        if error.code == UNAUTHORIZED_STATUS_CODE:
+            return True
+
+        response_data = error.details
+        if not isinstance(response_data, dict):
+            return False
+
+        error_data = response_data.get("error", response_data)
+        if not isinstance(error_data, dict):
+            return False
+
+        details = error_data.get("details")
+        if not isinstance(details, list):
+            return False
+
+        return any(
+            isinstance(detail, dict)
+            and detail.get("reason") == INVALID_API_KEY_REASON
+            for detail in details
+        )
+
+
+    def _request_credential_validation(self) -> None:
+        self._client.models.list(config={"page_size": 1})
 
 
     def count_tokens(
@@ -116,7 +150,7 @@ class GeminiAdapter(LLMAdapter):
         contents: list[dict[str, Any]],
         system_instruction: str | None = None,
     ) -> int:
-        contents = self.format_history(contents)
+        contents = self._format_history(contents)
         if system_instruction:
             contents = [
                 self._user_message(f"SYSTEM_INSTRUCTION:\n{system_instruction}")
@@ -124,7 +158,6 @@ class GeminiAdapter(LLMAdapter):
 
         response = self._execute_with_retries(
             api_func=self._client.models.count_tokens,
-            ui=self._ui,
             model=model,
             contents=contents,
         )
@@ -142,9 +175,8 @@ class GeminiAdapter(LLMAdapter):
     ) -> str:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            ui=self._ui,
             model=model,
-            contents=self.format_history(contents),
+            contents=self._format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
@@ -165,9 +197,8 @@ class GeminiAdapter(LLMAdapter):
     ) -> dict[str, Any]:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            ui=self._ui,
             model=model,
-            contents=self.format_history(contents),
+            contents=self._format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,
@@ -194,9 +225,8 @@ class GeminiAdapter(LLMAdapter):
     ) -> dict[str, Any]:
         response = self._execute_with_retries(
             api_func=self._client.models.generate_content,
-            ui=self._ui,
             model=model,
-            contents=self.format_history(contents),
+            contents=self._format_history(contents),
             config=self._generate_config(
                 system_instruction=system_instruction,
                 temperature=temperature,

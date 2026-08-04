@@ -23,13 +23,9 @@ from axon.retrieval.factory import create_reranker
 
 from axon.agent.library_search_tool import LibrarySearchTool
 
-from axon.config.credential_store import CredentialStore
-
-from axon.config.paths import ENV_PATH
-
 from axon.llm.chat_llm import ChatLLM
-from axon.llm.factory import create_llm_adapter
-from axon.llm.models import MODEL_OPTIONS, DEFAULT_CHAT_MODEL
+from axon.llm.llm_adapter import LLMAdapter
+from axon.llm.models import MODEL_OPTIONS
 
 from .chat_handlers import ChatHandlers
 from .library_handlers import LibraryHandlers
@@ -39,13 +35,17 @@ from .reference_presenter import ReferencePresenter
 
 
 class SessionManager:
-    def __init__(self):
-        self._ui = AxonUI()
-        self._credentials = CredentialStore(ENV_PATH)
+    def __init__(
+        self,
+        ui: AxonUI,
+        llm_adapter: LLMAdapter,
+    ):
         self._agent_mode_enabled = False
+        self._ui = ui
+        self._llm_adapter = llm_adapter
+        self._llm = ChatLLM(self._ui, self._llm_adapter)
 
         self._init_database()
-        self._init_llm()
         self._init_ingestion()
         self._init_session_services()
         self._init_command_processor()
@@ -60,15 +60,6 @@ class SessionManager:
         self._chat_repository = ChatRepository(self._database)
         self._chunk_repository = ChunkRepository(self._database)
         self._paper_repository = PaperRepository(self._database)
-
-
-    def _init_llm(self) -> None:
-        self._llm_adapter = create_llm_adapter(
-            DEFAULT_CHAT_MODEL,
-            self._ui,
-            self._credentials,
-        )
-        self._llm = ChatLLM(self._ui, self._llm_adapter)
 
 
     def _init_ingestion(self) -> None:
@@ -182,15 +173,7 @@ class SessionManager:
 
     def _select_model(self) -> None:
         selected_model = self._ui.select_option(MODEL_OPTIONS)
-
-        self._llm_adapter = create_llm_adapter(
-            selected_model,
-            self._ui,
-            self._credentials,
-        )
-        self._llm.set_llm_adapter(self._llm_adapter)
         self._llm.set_chat_model(selected_model)
-
         self._ui.info(f"Using Model: {emphasis(selected_model)}")
 
 

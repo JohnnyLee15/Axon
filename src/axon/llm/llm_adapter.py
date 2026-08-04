@@ -5,15 +5,12 @@ from axon.ui.axon_ui import AxonUI
 
 from .contracts import LLM_CONTRACT
 from .retry import execute_with_retries
+from .errors import InvalidCredentialsError
 
 
 class LLMAdapter(ABC):
-    @abstractmethod
-    def _format_tools(
-        self,
-        tools: list[dict[str, Any]] | None,
-    ) -> Any:
-        raise NotImplementedError
+    def __init__(self, ui: AxonUI):
+        self._ui = ui
 
 
     @abstractmethod
@@ -46,7 +43,16 @@ class LLMAdapter(ABC):
 
     @abstractmethod
     def _is_retryable_error(self, error: Exception) -> bool:
-        """Return whether a provider error should be retried."""
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _is_invalid_api_key_error(self, error: Exception) -> bool:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def _request_credential_validation(self) -> None:
         raise NotImplementedError
 
 
@@ -112,20 +118,19 @@ class LLMAdapter(ABC):
     def _execute_with_retries(
         self,
         api_func: Callable,
-        ui: AxonUI,
         *args,
         **kwargs
     ) -> Any:
         return execute_with_retries(
-            api_func,
-            self._is_retryable_error,
-            ui,
+            api_func=api_func,
+            is_retryable_error=self._is_retryable_error,
+            ui=self._ui,
             *args,
             **kwargs,
         )
 
 
-    def format_history(
+    def _format_history(
         self,
         history: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -147,4 +152,11 @@ class LLMAdapter(ABC):
         return contents
 
 
+    def validate_credentials(self) -> None:
+        try:
+            self._execute_with_retries(api_func=self._request_credential_validation)
+        except Exception as e:
+            if self._is_invalid_api_key_error(e):
+                raise InvalidCredentialsError from e
 
+            raise

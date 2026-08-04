@@ -1,13 +1,26 @@
+# Secrets
 .env
-.DS_Store
-test*
-axon_venv
-__pycache__
-data/
-**/*.txt
-**/*.zsh
-axon.pptx
-docs/
+
+# Development environment
+/.venv/
+
+# Python-generated files
+__pycache__/
 *.egg-info/
-build/
-dist/
+
+# Package builds
+/build/
+/dist/
+
+# Manual experiments
+/testing/
+
+# Local project artifacts
+/docs/axon.pptx
+
+# Local developer files
+/collect_py.zsh
+/py.txt
+
+# macOS metadata
+.DS_Store

@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
 
-from dotenv import dotenv_values
+from dotenv import dotenv_values, set_key
 
 
 class CredentialStore:
     def __init__(self, env_path: Path) -> None:
+        self._env_path = env_path
         self._credentials = dotenv_values(env_path)
 
 
@@ -19,3 +20,13 @@ class CredentialStore:
             return None
 
         return stored_value
+
+
+    def set(self, key: str, value: str) -> None:
+        set_key(
+            dotenv_path=self._env_path,
+            key_to_set=key,
+            value_to_set=value,
+            quote_mode="never",
+        )
+        self._credentials[key] = value

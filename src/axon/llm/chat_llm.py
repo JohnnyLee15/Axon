@@ -94,10 +94,6 @@ class ChatLLM:
         self._chat_model = model
 
 
-    def set_llm_adapter(self, llm_adapter: LLMAdapter) -> None:
-        self._llm_adapter = llm_adapter
-
-
     def set_chat_limit(self, limit: int) -> None:
         self._context_size = limit
 

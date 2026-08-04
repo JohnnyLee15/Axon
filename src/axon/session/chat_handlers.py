@@ -95,7 +95,7 @@ class ChatHandlers:
     def _delete_all_chats(self) -> None:
         self._ui.warning("This will permanently delete ALL saved chats.")
         confirm_options = f"{CONFIRM_YES}/{CONFIRM_NO}"
-        confirm = self._ui.confirm(f"Are you sure? ({emphasis(confirm_options)}): ")
+        confirm = self._ui.confirm(f"Are you sure? ({emphasis(confirm_options)})")
 
         if confirm.strip().lower() != CONFIRM_YES:
             self._ui.info("Deletion canceled.")

@@ -102,3 +102,7 @@ class AxonUI:
 
     def confirm(self, text: str, leading_blank: bool = True) -> str:
         return self._messages.confirm(text, leading_blank)
+
+
+    def request_secret(self, text: str, leading_blank: bool = True) -> str:
+        return self._messages.request_secret(text, leading_blank)

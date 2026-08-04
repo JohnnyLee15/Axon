@@ -32,6 +32,7 @@ class MessageEmojis:
     UNKNOWN = "❓"
     CONFIRM = "❓"
     PROGRESS = "⏳"
+    CREDENTIAL = "🔑"
 
 MESSAGE_EMOJIS = MessageEmojis()
 

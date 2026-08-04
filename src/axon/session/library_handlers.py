@@ -23,7 +23,7 @@ class LibraryHandlers:
         self._ui.warning("This will permanently delete ALL papers from the database.")
 
         options = f"{CONFIRM_YES}/{CONFIRM_NO}"
-        confirm = self._ui.confirm(f"Are you sure? ({emphasis(options)}): ").strip().lower()
+        confirm = self._ui.confirm(f"Are you sure? ({emphasis(options)})").strip().lower()
         if confirm != CONFIRM_YES:
             self._ui.info("Library clear canceled.")
             return

@@ -81,7 +81,7 @@ class AgentRunner:
         )
         choice_raw = self._ui.confirm(
             f"Agent wants to use tool {emphasis(tool_name)}. "
-            f"Allow? {choice_descriptions}: "
+            f"Allow? {choice_descriptions}"
         ).strip()
         choice = choice_raw.lower()
 

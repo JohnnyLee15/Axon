@@ -43,4 +43,11 @@ class Messages:
         if leading_blank:
             self._console.print()
 
-        return self._console.input(f"{MESSAGE_EMOJIS.CONFIRM} {text}")
+        return self._console.input(f"{MESSAGE_EMOJIS.CONFIRM} {text}: ")
+
+
+    def request_secret(self, text: str, leading_blank: bool = True) -> str:
+        if leading_blank:
+            self._console.print()
+
+        return self._console.input(f"{MESSAGE_EMOJIS.CREDENTIAL} {text}: ", password=True)
