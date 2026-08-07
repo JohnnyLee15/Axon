@@ -98,6 +98,10 @@ class ChatLLM:
         self._context_size = limit
 
 
+    def get_chat_model(self) -> str:
+        return self._chat_model
+
+
     def get_chat_limit(self) -> int:
         return self._context_size
 

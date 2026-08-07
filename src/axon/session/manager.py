@@ -181,12 +181,15 @@ class SessionManager:
         should_exit = False
         while not should_exit:
             curr_tokens = self._llm.get_token_count()
-            user_input = self._ui.listen(curr_tokens, self._llm.get_chat_limit())
+            user_input = self._ui.listen(
+                curr_tokens=curr_tokens,
+                context_size=self._llm.get_chat_limit(),
+                model_name=self._llm.get_chat_model(),
+            )
             if not user_input:
                 continue
 
             if user_input.startswith("/"):
-                #TODO: When clear screen don't print cursor on new line
                 should_exit = self._command_processor.process(user_input)
                 continue
 

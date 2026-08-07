@@ -15,10 +15,11 @@ OPTION_LABEL_KEY = "label"
 
 
 class AxonUI:
-    def __init__(self):
+    def __init__(self, command_options: dict[str, str]):
         # TODO add a name to the database
+        self._suppress_next_prompt_newline = False
         self._console = Console(highlight=False)
-        self._prompt = Prompt(self._console)
+        self._prompt = Prompt(console=self._console, command_options=command_options)
         self._tool_renderers = ToolRenderers(self._console)
         self._views = Views(self._console)
         self._messages = Messages(self._console)
@@ -44,6 +45,7 @@ class AxonUI:
 
     def clear_screen(self) -> None:
         self._console.clear()
+        self._suppress_next_prompt_newline = True
 
 
     def select_option(self, options: list[dict[str, Any]]) -> str:
@@ -56,8 +58,21 @@ class AxonUI:
         return label_to_id[selected_label]
 
 
-    def listen(self, curr_tokens: int | None, context_size: int) -> str:
-        return self._prompt.listen(curr_tokens, context_size)
+    def listen(
+            self, curr_tokens: int | None,
+            context_size: int,
+            model_name: str,
+        ) -> str:
+        if self._suppress_next_prompt_newline:
+            self._suppress_next_prompt_newline = False
+        else:
+            self._console.print()
+
+        return self._prompt.listen(
+            curr_tokens=curr_tokens,
+            context_size=context_size,
+            model_name=model_name,
+        )
 
 
     def wait(self) -> Live:
