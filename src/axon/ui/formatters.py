@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from .theme import STYLES
 
 def emphasis(text: object) -> str:
@@ -27,3 +29,14 @@ def format_elapsed_time(total_seconds: int) -> str:
         return f"{minutes}m {seconds:02d}s"
 
     return f"{seconds}s"
+
+
+def format_timestamp(timestamp: str) -> str:
+    try:
+        local_time = datetime.fromisoformat(timestamp).astimezone()
+    except ValueError:
+        return timestamp
+
+    date_text = local_time.strftime("%b %d, %Y")
+    time_text = local_time.strftime("%I:%M %p").lstrip("0")
+    return f"{date_text} {time_text}"

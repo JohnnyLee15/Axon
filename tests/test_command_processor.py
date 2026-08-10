@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 from axon.commands.contracts import COMMAND_KEYS
 from axon.commands.processor import CommandProcessor
+from axon.commands.registry import COMMANDS
 
 
 class CommandProcessorTests(unittest.IsolatedAsyncioTestCase):
@@ -43,6 +44,30 @@ class CommandProcessorTests(unittest.IsolatedAsyncioTestCase):
         self._handler.assert_called_once_with(
             "~/Research Papers/paper.pdf"
         )
+
+    async def test_chat_load_accepts_no_name_for_interactive_selection(self) -> None:
+        handler = Mock()
+        processor = CommandProcessor(
+            commands=COMMANDS,
+            handlers={"load_chat": handler},
+            ui=self._ui,
+        )
+
+        await processor.process("/chat load")
+
+        handler.assert_called_once_with()
+
+    async def test_chat_delete_accepts_no_name_for_interactive_selection(self) -> None:
+        handler = Mock()
+        processor = CommandProcessor(
+            commands=COMMANDS,
+            handlers={"delete_chat": handler},
+            ui=self._ui,
+        )
+
+        await processor.process("/chat delete")
+
+        handler.assert_called_once_with()
 
 
 if __name__ == "__main__":

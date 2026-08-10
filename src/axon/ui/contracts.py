@@ -1,2 +1,2 @@
-OPTION_ID_KEY = "id"
-OPTION_LABEL_KEY = "label"
+OPTION_KEY = "option"
+OPTION_DESC_KEY = "desc"

@@ -3,14 +3,16 @@ from typing import Any
 from rich.console import Console
 from rich.live import Live
 
+from axon.db.models import ChatSummary
 from axon.ui.select_menu import SelectMenu
 
 from .prompt import Prompt
 from .tool_renderers import ToolRenderers
 from .views import Views
 from .messages import Messages
-from .contracts import OPTION_ID_KEY, OPTION_LABEL_KEY
+from .contracts import OPTION_DESC_KEY, OPTION_KEY
 from .interrupt_listener import InterruptListener
+from .formatters import format_timestamp
 
 
 class AxonUI:
@@ -31,8 +33,48 @@ class AxonUI:
         self._views.display_help(commands)
 
 
-    def display_chat_names(self, chat_names: list[str]) -> None:
-        self._views.display_chat_names(chat_names)
+    def display_chats(self, chats: list[ChatSummary]) -> None:
+        self._views.display_chats(chats)
+
+
+    async def select_chat(self, chats: list[ChatSummary]) -> str | None:
+        if not chats:
+            return None
+
+        rows = [
+            (
+                chat.name,
+                format_timestamp(chat.created_at),
+                format_timestamp(chat.last_accessed_at),
+            )
+            for chat in chats
+        ]
+        name_width = max(len("Name"), *(len(row[0]) for row in rows))
+        created_width = max(len("Created"), *(len(row[1]) for row in rows))
+
+        header = (
+            f"{'Name':<{name_width}}  "
+            f"{'Created':<{created_width}}  "
+            "Last Accessed"
+        )
+        labels_to_names = {
+            (
+                f"{name:<{name_width}}  "
+                f"{created:<{created_width}}  "
+                f"{last_accessed}"
+            ): name
+            for name, created, last_accessed in rows
+        }
+
+        selected_label = await self._select_menu.select_item(
+            list(labels_to_names),
+            header=header,
+        )
+        return labels_to_names.get(selected_label)
+
+
+    def display_history(self, history: list[dict[str, Any]]) -> None:
+        self._views.display_history(history)
 
 
     def display_references(self, papers: list[tuple]) -> None:
@@ -51,26 +93,27 @@ class AxonUI:
     async def select_item(
         self,
         options: list[dict[str, Any]],
-        selected_id: Any | None = None,
+        selected_option: Any | None = None,
     ) -> Any | None:
-        labels = [option[OPTION_LABEL_KEY] for option in options]
-
-        id_to_label = {
-            option[OPTION_ID_KEY]: option[OPTION_LABEL_KEY]
+        option_values = [option[OPTION_KEY] for option in options]
+        item_texts = [
+            f"{value:,}" if isinstance(value, int) else str(value)
+            for value in option_values
+        ]
+        descriptions = [
+            str(option[OPTION_DESC_KEY])
             for option in options
-        }
+        ]
+        items_to_options = dict(zip(item_texts, option_values, strict=True))
+        options_to_items = dict(zip(option_values, item_texts, strict=True))
 
-        label_to_id = {
-            option[OPTION_LABEL_KEY]: option[OPTION_ID_KEY]
-            for option in options
-        }
-
-        selected_label = await self._select_menu.select_item(
-            labels,
-            selected_item=id_to_label.get(selected_id),
+        selected_item = await self._select_menu.select_item(
+            item_texts,
+            descriptions=descriptions,
+            selected_item=options_to_items.get(selected_option),
         )
 
-        return label_to_id.get(selected_label)
+        return items_to_options.get(selected_item)
 
 
     async def listen(

@@ -151,12 +151,30 @@ class ChatLLM:
         self._history.append(model_message(response))
 
 
-    def add_tool_call_history(self, tool_name: str, tool_args: dict) -> None:
-        self._history.append(tool_call(tool_name, tool_args))
+    def add_tool_call_history(
+        self,
+        tool_name: str,
+        tool_args: dict,
+        provider_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self._history.append(tool_call(
+            tool_name,
+            tool_args,
+            provider_metadata,
+        ))
 
 
-    def add_tool_response_history(self, tool_name: str, result: str) -> None:
-        self._history.append(tool_response(tool_name, result))
+    def add_tool_response_history(
+        self,
+        tool_name: str,
+        result: str,
+        provider_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self._history.append(tool_response(
+            tool_name,
+            result,
+            provider_metadata,
+        ))
 
 
     async def query_chat(self, user_input: str, chunks: str | None) -> str | None:

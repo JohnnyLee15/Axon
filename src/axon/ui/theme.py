@@ -80,6 +80,7 @@ PROMPT_STYLE = Style.from_dict({
     "user-input": f"fg:default bg:{USER_INPUT_BACKGROUND}",
 
     "input-status": "fg:default bg:default dim",
+    "resize-notice": "fg:default bg:default dim",
 })
 
 

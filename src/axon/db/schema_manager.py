@@ -2,6 +2,7 @@ import sqlite3
 
 from .sqlite_database import SQLiteDatabase
 from .min_hasher import LSH_BAND_COUNT
+from .contracts import CHAT_FIELDS
 
 
 CHUNK_TABLE = "chunks"
@@ -57,8 +58,10 @@ class SchemaManager:
 
         create_chats_table = f"""
             CREATE TABLE IF NOT EXISTS {CHAT_TABLE} (
-                name TEXT PRIMARY KEY,
-                chat_content TEXT
+                {CHAT_FIELDS.NAME} TEXT PRIMARY KEY,
+                {CHAT_FIELDS.CONTENT} TEXT NOT NULL,
+                {CHAT_FIELDS.CREATED_AT} TEXT NOT NULL,
+                {CHAT_FIELDS.LAST_ACCESSED_AT} TEXT NOT NULL
             );
         """
 

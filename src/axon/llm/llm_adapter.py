@@ -28,6 +28,7 @@ class LLMAdapter(ABC):
         self,
         name: str,
         args: dict[str, Any],
+        provider_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -37,6 +38,7 @@ class LLMAdapter(ABC):
         self,
         name: str,
         result: str,
+        provider_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -158,9 +160,17 @@ class LLMAdapter(ABC):
             elif item_type == LLM_CONTRACT.MODEL_TEXT:
                 contents.append(self._model_message(item[LLM_CONTRACT.TEXT]))
             elif item_type == LLM_CONTRACT.TOOL_CALL:
-                contents.append(self._tool_call_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.ARGS]))
+                contents.append(self._tool_call_message(
+                    item[LLM_CONTRACT.NAME],
+                    item[LLM_CONTRACT.ARGS],
+                    item.get(LLM_CONTRACT.PROVIDER_METADATA),
+                ))
             elif item_type == LLM_CONTRACT.TOOL_RESPONSE:
-                contents.append(self._tool_response_message(item[LLM_CONTRACT.NAME], item[LLM_CONTRACT.RESULT]))
+                contents.append(self._tool_response_message(
+                    item[LLM_CONTRACT.NAME],
+                    item[LLM_CONTRACT.RESULT],
+                    item.get(LLM_CONTRACT.PROVIDER_METADATA),
+                ))
             else:
                 raise ValueError(f"Unknown Axon history item type: {item_type}")
 

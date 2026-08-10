@@ -1,4 +1,4 @@
-from axon.ui.contracts import OPTION_ID_KEY, OPTION_LABEL_KEY
+from axon.ui.contracts import OPTION_DESC_KEY, OPTION_KEY
 from axon.llm.models import (
     GEMINI_2_5_FLASH,
     GEMINI_2_5_FLASH_LITE,
@@ -10,20 +10,20 @@ from axon.llm.models import (
 )
 
 CHAT_LIMIT_OPTIONS = [
-    {OPTION_ID_KEY: 10000, OPTION_LABEL_KEY: "10,000 (small)"},
-    {OPTION_ID_KEY: 20000, OPTION_LABEL_KEY: "20,000 (short)"},
-    {OPTION_ID_KEY: 50000, OPTION_LABEL_KEY: "50,000 (medium)"},
-    {OPTION_ID_KEY: 100000, OPTION_LABEL_KEY: "100,000 (large)"},
-    {OPTION_ID_KEY: 200000, OPTION_LABEL_KEY: "200,000 (huge)"},
-    {OPTION_ID_KEY: 750000, OPTION_LABEL_KEY: "750,000 (max)"}
+    {OPTION_KEY: 10000, OPTION_DESC_KEY: "small"},
+    {OPTION_KEY: 20000, OPTION_DESC_KEY: "short"},
+    {OPTION_KEY: 50000, OPTION_DESC_KEY: "medium"},
+    {OPTION_KEY: 100000, OPTION_DESC_KEY: "large"},
+    {OPTION_KEY: 200000, OPTION_DESC_KEY: "huge"},
+    {OPTION_KEY: 750000, OPTION_DESC_KEY: "max"}
 ]
 
 MODEL_OPTIONS = [
-    {OPTION_ID_KEY: GEMINI_2_5_FLASH_LITE, OPTION_LABEL_KEY: f"{GEMINI_2_5_FLASH_LITE} (cheapest | retires Oct 2026)"},
-    {OPTION_ID_KEY: GEMINI_3_1_FLASH_LITE, OPTION_LABEL_KEY: f"{GEMINI_3_1_FLASH_LITE} (budget | stable)"},
-    {OPTION_ID_KEY: GEMINI_2_5_FLASH, OPTION_LABEL_KEY: f"{GEMINI_2_5_FLASH} (low cost | retires Oct 2026)"},
-    {OPTION_ID_KEY: GEMINI_3_FLASH_PREVIEW, OPTION_LABEL_KEY: f"{GEMINI_3_FLASH_PREVIEW} (mid cost | preview)"},
-    {OPTION_ID_KEY: GEMINI_3_5_FLASH, OPTION_LABEL_KEY: f"{GEMINI_3_5_FLASH} (recommended | stable)"},
-    {OPTION_ID_KEY: GEMINI_2_5_PRO, OPTION_LABEL_KEY: f"{GEMINI_2_5_PRO} (high cost | retires Oct 2026)"},
-    {OPTION_ID_KEY: GEMINI_3_1_PRO_PREVIEW, OPTION_LABEL_KEY: f"{GEMINI_3_1_PRO_PREVIEW} (highest cost | preview)"},
+    {OPTION_KEY: GEMINI_2_5_FLASH_LITE, OPTION_DESC_KEY: "cheapest | retires Oct 2026"},
+    {OPTION_KEY: GEMINI_3_1_FLASH_LITE, OPTION_DESC_KEY: "budget | stable"},
+    {OPTION_KEY: GEMINI_2_5_FLASH, OPTION_DESC_KEY: "low cost | retires Oct 2026"},
+    {OPTION_KEY: GEMINI_3_FLASH_PREVIEW, OPTION_DESC_KEY: "mid cost | preview"},
+    {OPTION_KEY: GEMINI_3_5_FLASH, OPTION_DESC_KEY: "recommended | stable"},
+    {OPTION_KEY: GEMINI_2_5_PRO, OPTION_DESC_KEY: "high cost | retires Oct 2026"},
+    {OPTION_KEY: GEMINI_3_1_PRO_PREVIEW, OPTION_DESC_KEY: "highest cost | preview"},
 ]

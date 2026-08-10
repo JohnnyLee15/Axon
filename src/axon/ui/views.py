@@ -1,20 +1,24 @@
 from typing import Any
 
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich import box
 
 from axon.commands.contracts import COMMAND_KEYS
+from axon.db.models import ChatSummary
+from axon.llm.contracts import LLM_CONTRACT
 
-from .theme import STYLES, VIEW_EMOJIS
+from .theme import STYLES, THEME_COLOUR, VIEW_EMOJIS
 from .formatters import (
     strong,
     panel_title,
-    dim,
     emphasis,
     format_elapsed_time,
+    format_timestamp,
 )
 
 
@@ -104,25 +108,106 @@ class Views:
         self._console.print(table)
 
 
-    def display_chat_names(self, chat_names: list[str]) -> None:
-        if not chat_names:
+    def display_chats(self, chats: list[ChatSummary]) -> None:
+        if not chats:
             self._console.print(f"\n{VIEW_EMOJIS.EMPTY} {strong('No saved chats found in the database.')}")
             return
 
-        list_contents = ""
-        for name in chat_names:
-            list_contents += f"  {dim('•')} \"{emphasis(name)}\"\n"
-
-        panel = Panel(
-            list_contents.rstrip(),
+        table = Table(
             title=panel_title(VIEW_EMOJIS.SAVED_CHATS, "Saved Chats"),
-            title_align="center",
+            box=box.ROUNDED,
             expand=False,
-            border_style=STYLES.STRONG
+            padding=(0, 2),
+        )
+        table.add_column("Name", style=STYLES.EMPHASIS)
+        table.add_column("Created")
+        table.add_column("Last Accessed")
+
+        for chat in chats:
+            table.add_row(
+                chat.name,
+                format_timestamp(chat.created_at),
+                format_timestamp(chat.last_accessed_at),
+            )
+
+        self._console.print()
+        self._console.print(table)
+
+
+    def _display_history_text(
+        self,
+        label: str,
+        text: str,
+        label_style: str,
+    ) -> None:
+        self._console.print()
+        self._console.print(
+            Text(f"[{label}] >", style=label_style),
+            end=" ",
+        )
+        self._console.print(Markdown(text))
+
+
+    def _display_history_tool_header(self, label: str, tool_name: Any) -> None:
+        header = Text(f"[{label}] ", style=STYLES.DIM)
+        header.append(
+            str(tool_name),
+            style=f"{STYLES.DIM} {THEME_COLOUR}",
+        )
+        self._console.print(header)
+
+
+    def _display_history_tool_call(self, item: dict[str, Any]) -> None:
+        tool_name = item.get(LLM_CONTRACT.NAME, "Unknown tool")
+        tool_args = item.get(LLM_CONTRACT.ARGS, {})
+
+        self._console.print()
+        self._display_history_tool_header("Tool", tool_name)
+
+        for arg_name, arg_value in tool_args.items():
+            argument = Text(
+                f"{arg_name}: {arg_value}",
+                style=STYLES.DIM,
+            )
+            self._console.print(Padding(argument, (0, 0, 0, 2)))
+
+
+    def _display_history_tool_response(self, item: dict[str, Any]) -> None:
+        tool_name = item.get(LLM_CONTRACT.NAME, "Unknown tool")
+        result = item.get(LLM_CONTRACT.RESULT, "")
+
+        self._console.print()
+        self._display_history_tool_header("Result", tool_name)
+        self._console.print(
+            Padding(
+                Text(str(result), style=STYLES.DIM),
+                (0, 0, 0, 2),
+            )
         )
 
-        self._console.print("\n")
-        self._console.print(panel)
+
+    def display_history(self, history: list[dict[str, Any]]) -> None:
+        self.display_section("Chat History")
+
+        for item in history:
+            item_type = item.get(LLM_CONTRACT.TYPE)
+
+            if item_type == LLM_CONTRACT.USER_TEXT:
+                self._display_history_text(
+                    label="You",
+                    text=str(item.get(LLM_CONTRACT.TEXT, "")),
+                    label_style=STYLES.EMPHASIS,
+                )
+            elif item_type == LLM_CONTRACT.MODEL_TEXT:
+                self._display_history_text(
+                    label="Axon",
+                    text=str(item.get(LLM_CONTRACT.TEXT, "")),
+                    label_style=STYLES.STRONG,
+                )
+            elif item_type == LLM_CONTRACT.TOOL_CALL:
+                self._display_history_tool_call(item)
+            elif item_type == LLM_CONTRACT.TOOL_RESPONSE:
+                self._display_history_tool_response(item)
 
 
     def display_references(self, papers: list[tuple]) -> None:

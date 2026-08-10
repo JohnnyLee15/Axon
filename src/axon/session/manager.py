@@ -11,7 +11,7 @@ from axon.db.min_hasher import MinHasher
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
-from axon.ui.contracts import OPTION_ID_KEY
+from axon.ui.contracts import OPTION_KEY
 
 from axon.ingestion.ingestion_runner import IngestionRunner
 from axon.ingestion.semantic_chunker import SemanticChunker
@@ -148,6 +148,7 @@ class SessionManager:
             COMMAND_HANDLER_NAMES.SAVE_CHAT: self._chat_handlers.save_chat,
             COMMAND_HANDLER_NAMES.LOAD_CHAT: self._chat_handlers.load_chat,
             COMMAND_HANDLER_NAMES.CLEAR_CHAT: self._chat_handlers.clear_chat,
+            COMMAND_HANDLER_NAMES.DISPLAY_HISTORY: self._chat_handlers.display_history,
             COMMAND_HANDLER_NAMES.SET_LIMIT: self._chat_handlers.set_limit,
             COMMAND_HANDLER_NAMES.COMPACT: self._chat_handlers.compact,
             COMMAND_HANDLER_NAMES.AUTO_COMPACT: self._chat_handlers.auto_compact,
@@ -176,7 +177,7 @@ class SessionManager:
 
 
     def _get_saved_chat_model(self) -> str:
-        model_options = [option[OPTION_ID_KEY] for option in MODEL_OPTIONS]
+        model_options = [option[OPTION_KEY] for option in MODEL_OPTIONS]
         saved_model = self._settings.get(CHAT_MODEL_KEY)
         if saved_model in model_options:
             return saved_model
@@ -185,7 +186,7 @@ class SessionManager:
 
 
     def _get_saved_chat_limit(self) -> int:
-        chat_limit_options = [option[OPTION_ID_KEY] for option in CHAT_LIMIT_OPTIONS]
+        chat_limit_options = [option[OPTION_KEY] for option in CHAT_LIMIT_OPTIONS]
         saved_limit = self._settings.get(CHAT_LIMIT_KEY)
         if saved_limit in chat_limit_options:
             return saved_limit
@@ -215,7 +216,7 @@ class SessionManager:
     async def _select_model(self) -> None:
         selected_model = await self._ui.select_item(
             options=MODEL_OPTIONS,
-            selected_id=self._llm.get_chat_model(),
+            selected_option=self._llm.get_chat_model(),
         )
 
         if selected_model is None:

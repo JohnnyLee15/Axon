@@ -14,6 +14,7 @@ class CommandHandlerNames:
     SAVE_CHAT = "save_chat"
     LOAD_CHAT = "load_chat"
     CLEAR_CHAT = "clear_chat"
+    DISPLAY_HISTORY = "display_history"
     SET_LIMIT = "set_limit"
     COMPACT = "compact"
     AUTO_COMPACT = "auto_compact"

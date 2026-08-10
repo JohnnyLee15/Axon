@@ -4,3 +4,13 @@ class ChunkFields:
     TEXT = "text"
 
 CHUNK_FIELDS = ChunkFields()
+
+
+class ChatFields:
+    NAME = "name"
+    CONTENT = "chat_content"
+    CREATED_AT = "created_at"
+    LAST_ACCESSED_AT = "last_accessed_at"
+
+
+CHAT_FIELDS = ChatFields()

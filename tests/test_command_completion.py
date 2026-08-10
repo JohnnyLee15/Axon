@@ -11,12 +11,13 @@ class CommandCompletionTests(unittest.TestCase):
 
         self.assertIn("/help", command_options)
         self.assertIn("/chat save", command_options)
+        self.assertIn("/chat history", command_options)
         self.assertIn("/library clear", command_options)
         self.assertNotIn("/chat", command_options)
         self.assertNotIn("/library", command_options)
         self.assertEqual(
             command_options["/chat load"],
-            "Loads a previously saved chat history.",
+            "Selects and loads a saved chat, or loads one by name.",
         )
 
     def test_builds_one_option_for_every_registered_command(self) -> None:

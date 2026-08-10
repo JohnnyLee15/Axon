@@ -1,6 +1,7 @@
 import sqlite3
 
 from axon.db.chat_repository import ChatRepository
+from axon.db.models import ChatSummary
 from axon.llm.chat_llm import ChatLLM
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
@@ -58,7 +59,32 @@ class ChatHandlers:
         self._ui.success(f"Chat saved as \"{emphasis(name)}\"!")
 
 
-    def load_chat(self, name: str) -> None:
+    def _get_chat_summaries(self) -> list[ChatSummary] | None:
+        try:
+            return self._chat_repository.get_chat_summaries()
+        except sqlite3.Error as error:
+            self._ui.error(f"Could not retrieve saved chats: {error}")
+            return None
+
+
+    async def _select_saved_chat(self) -> str | None:
+        chats = self._get_chat_summaries()
+        if chats is None:
+            return None
+
+        if not chats:
+            self._ui.info("No saved chats found in the database.")
+            return None
+
+        return await self._ui.select_chat(chats)
+
+
+    async def load_chat(self, name: str | None = None) -> None:
+        if name is None:
+            name = await self._select_saved_chat()
+            if name is None:
+                return
+
         name = name.strip()
 
         try:
@@ -80,14 +106,21 @@ class ChatHandlers:
         self._ui.success("Chat history cleared!")
 
 
-    def list_chats(self) -> None:
-        try:
-            chat_names = self._chat_repository.get_all_chat_names()
-        except sqlite3.Error as error:
-            self._ui.error(f"Could not retrieve saved chats: {error}")
+    def display_history(self) -> None:
+        history = self._llm.get_history()
+        if not history:
+            self._ui.info("No chat history is currently retained.")
             return
 
-        self._ui.display_chat_names(chat_names)
+        self._ui.display_history(history)
+
+
+    def list_chats(self) -> None:
+        chats = self._get_chat_summaries()
+        if chats is None:
+            return
+
+        self._ui.display_chats(chats)
 
 
     def _delete_all_chats(self) -> None:
@@ -122,7 +155,12 @@ class ChatHandlers:
         self._ui.warning(f"Chat \"{emphasis(chat_name)}\" not found.")
 
 
-    def delete_chat(self, arg: str) -> None:
+    async def delete_chat(self, arg: str | None = None) -> None:
+        if arg is None:
+            arg = await self._select_saved_chat()
+            if arg is None:
+                return
+
         arg = arg.strip()
 
         if arg == DELETE_ALL_CHATS_FLAG:
@@ -141,7 +179,7 @@ class ChatHandlers:
     async def set_limit(self) -> None:
         selected_limit = await self._ui.select_item(
             options=CHAT_LIMIT_OPTIONS,
-            selected_id=self._llm.get_chat_limit(),
+            selected_option=self._llm.get_chat_limit(),
         )
 
         if selected_limit is None:

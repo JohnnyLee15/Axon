@@ -13,6 +13,8 @@ class SelectMenu:
     def __init__(self):
         self._highlighted_idx = 0
         self._items = []
+        self._descriptions = []
+        self._header = None
 
         self._control = FormattedTextControl(self._get_list)
         self._window = Window(content=self._control)
@@ -33,11 +35,34 @@ class SelectMenu:
     def _get_list(self) -> ANSI:
         item_list_str = ""
 
+        if self._header is not None:
+            item_list_str += (
+                f"  {ANSI_COLOURS.DIM}{self._header}"
+                f"{ANSI_COLOURS.RESET}\n"
+            )
+
+        item_width = max((len(item) for item in self._items), default=0)
         for i, item in enumerate(self._items):
             is_highlighted = (i == self._highlighted_idx)
             prefix = f"{theme_colour(ansi=True)}>{ANSI_COLOURS.RESET} " if is_highlighted else "  "
-            style = theme_colour(ansi=True) if is_highlighted else ""
-            item_list_str += f"{prefix}{style}{item}{ANSI_COLOURS.RESET}\n"
+            item_style = theme_colour(ansi=True) if is_highlighted else ""
+            desc_style = (
+                theme_colour(ansi=True)
+                if is_highlighted
+                else ANSI_COLOURS.DIM
+            )
+            item_text = item.ljust(item_width)
+            item_list_str += (
+                f"{prefix}{item_style}{item_text}{ANSI_COLOURS.RESET}"
+            )
+
+            description = self._descriptions[i]
+            if description:
+                item_list_str += (
+                    f"  {desc_style}{description}{ANSI_COLOURS.RESET}"
+                )
+
+            item_list_str += "\n"
 
         item_list_str +=  f"\n{ANSI_COLOURS.DIM}↑/↓ to move • Enter to select • Esc to cancel{ANSI_COLOURS.RESET}"
         return ANSI(item_list_str)
@@ -58,12 +83,16 @@ class SelectMenu:
         def _(event):
             selected_item = self._items[self._highlighted_idx]
             self._items = []
+            self._descriptions = []
+            self._header = None
             self._highlighted_idx = 0
             event.app.exit(result=selected_item)
 
         @self._kb.add("escape")
         def _(event):
             self._items = []
+            self._descriptions = []
+            self._header = None
             self._highlighted_idx = 0
             event.app.exit(result=None)
 
@@ -71,12 +100,19 @@ class SelectMenu:
     async def select_item(
         self,
         items: list[str],
+        descriptions: list[str] | None = None,
         selected_item: str | None = None,
+        header: str | None = None,
     ) -> str | None:
         if not items:
             return None
 
         self._items = items
+        self._descriptions = descriptions or [""] * len(items)
+        if len(self._descriptions) != len(items):
+            raise ValueError("Each selectable item must have one description.")
+
+        self._header = header
 
         if selected_item is not None and selected_item in items:
             self._highlighted_idx = items.index(selected_item)

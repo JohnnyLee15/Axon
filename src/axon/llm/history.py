@@ -16,20 +16,36 @@ def model_message(text: str) -> dict[str, Any]:
     }
 
 
-def tool_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
-    return {
+def tool_call(
+    name: str,
+    args: dict[str, Any],
+    provider_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    item = {
         LLM_CONTRACT.TYPE: LLM_CONTRACT.TOOL_CALL,
         LLM_CONTRACT.NAME: name,
         LLM_CONTRACT.ARGS: args
     }
+    if provider_metadata:
+        item[LLM_CONTRACT.PROVIDER_METADATA] = provider_metadata
+
+    return item
 
 
-def tool_response(name: str, result: str) -> dict[str, Any]:
-    return {
+def tool_response(
+    name: str,
+    result: str,
+    provider_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    item = {
         LLM_CONTRACT.TYPE: LLM_CONTRACT.TOOL_RESPONSE,
         LLM_CONTRACT.NAME: name,
         LLM_CONTRACT.RESULT: result,
     }
+    if provider_metadata:
+        item[LLM_CONTRACT.PROVIDER_METADATA] = provider_metadata
+
+    return item
 
 
 def text_message(text: str) -> list[dict[str, Any]]:

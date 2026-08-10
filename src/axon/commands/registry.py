@@ -9,9 +9,9 @@ CHAT_COMMANDS = {
         COMMAND_KEYS.HANDLER: "save_chat"
     },
     "load": {
-        COMMAND_KEYS.USAGE: "/chat load <chat name>",
-        COMMAND_KEYS.DESC: "Loads a previously saved chat history.",
-        COMMAND_KEYS.ARGC: 1,
+        COMMAND_KEYS.USAGE: "/chat load [chat name]",
+        COMMAND_KEYS.DESC: "Selects and loads a saved chat, or loads one by name.",
+        COMMAND_KEYS.ARGC: [0, 1],
         COMMAND_KEYS.HANDLER: "load_chat"
     },
     "clear": {
@@ -19,6 +19,12 @@ CHAT_COMMANDS = {
         COMMAND_KEYS.DESC: "Clears the current chat history.",
         COMMAND_KEYS.ARGC: 0,
         COMMAND_KEYS.HANDLER: "clear_chat"
+    },
+    "history": {
+        COMMAND_KEYS.USAGE: "/chat history",
+        COMMAND_KEYS.DESC: "Reprints the conversation history currently retained by Axon.",
+        COMMAND_KEYS.ARGC: 0,
+        COMMAND_KEYS.HANDLER: "display_history"
     },
     "limit": {
         COMMAND_KEYS.USAGE: "/chat limit",
@@ -45,9 +51,9 @@ CHAT_COMMANDS = {
         COMMAND_KEYS.HANDLER: "list_chats"
     },
     "delete": {
-        COMMAND_KEYS.USAGE: f"/chat delete <chat name> [{DELETE_ALL_CHATS_FLAG}]",
-        COMMAND_KEYS.DESC: f"Deletes a saved chat from the database. Use {DELETE_ALL_CHATS_FLAG} to delete all chats.",
-        COMMAND_KEYS.ARGC: 1,
+        COMMAND_KEYS.USAGE: f"/chat delete [chat name | {DELETE_ALL_CHATS_FLAG}]",
+        COMMAND_KEYS.DESC: f"Selects and deletes a saved chat. Use {DELETE_ALL_CHATS_FLAG} to delete all chats.",
+        COMMAND_KEYS.ARGC: [0, 1],
         COMMAND_KEYS.HANDLER: "delete_chat"
     },
     "roll": {

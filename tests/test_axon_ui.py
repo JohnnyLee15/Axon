@@ -58,55 +58,57 @@ class AxonUITests(unittest.IsolatedAsyncioTestCase):
             started_at=100.0,
         )
 
-    async def test_select_item_maps_string_id_to_label_and_back(self) -> None:
+    async def test_select_item_maps_string_option_to_display_and_back(self) -> None:
         options = [
-            {"id": "model-a", "label": "Model A"},
-            {"id": "model-b", "label": "Model B"},
+            {"option": "model-a", "desc": "fast"},
+            {"option": "model-b", "desc": "accurate"},
         ]
-        self._ui._select_menu.select_item.return_value = "Model B"
+        self._ui._select_menu.select_item.return_value = "model-b"
 
-        selected_id = await self._ui.select_item(
+        selected_option = await self._ui.select_item(
             options=options,
-            selected_id="model-a",
+            selected_option="model-a",
         )
 
-        self.assertEqual(selected_id, "model-b")
+        self.assertEqual(selected_option, "model-b")
         self._ui._select_menu.select_item.assert_awaited_once_with(
-            ["Model A", "Model B"],
-            selected_item="Model A",
+            ["model-a", "model-b"],
+            descriptions=["fast", "accurate"],
+            selected_item="model-a",
         )
 
-    async def test_select_item_maps_integer_id_to_label_and_back(self) -> None:
+    async def test_select_item_formats_integer_options_and_maps_them_back(self) -> None:
         options = [
-            {"id": 10_000, "label": "10,000"},
-            {"id": 20_000, "label": "20,000"},
+            {"option": 10_000, "desc": "small"},
+            {"option": 20_000, "desc": "short"},
         ]
         self._ui._select_menu.select_item.return_value = "20,000"
 
-        selected_id = await self._ui.select_item(
+        selected_option = await self._ui.select_item(
             options=options,
-            selected_id=10_000,
+            selected_option=10_000,
         )
 
-        self.assertEqual(selected_id, 20_000)
+        self.assertEqual(selected_option, 20_000)
         self._ui._select_menu.select_item.assert_awaited_once_with(
             ["10,000", "20,000"],
+            descriptions=["small", "short"],
             selected_item="10,000",
         )
 
     async def test_select_item_returns_none_when_menu_is_canceled(self) -> None:
         options = [
-            {"id": "model-a", "label": "Model A"},
-            {"id": "model-b", "label": "Model B"},
+            {"option": "model-a", "desc": "fast"},
+            {"option": "model-b", "desc": "accurate"},
         ]
         self._ui._select_menu.select_item.return_value = None
 
-        selected_id = await self._ui.select_item(
+        selected_option = await self._ui.select_item(
             options=options,
-            selected_id="model-a",
+            selected_option="model-a",
         )
 
-        self.assertIsNone(selected_id)
+        self.assertIsNone(selected_option)
 
 
 class AxonUIAsyncTests(unittest.IsolatedAsyncioTestCase):

@@ -14,6 +14,8 @@ class SelectMenuTests(unittest.IsolatedAsyncioTestCase):
         self._menu._app.run_async = AsyncMock(return_value="Second")
         self._menu._highlighted_idx = 0
         self._menu._items = []
+        self._menu._descriptions = []
+        self._menu._header = None
 
     async def test_starts_on_selected_item(self) -> None:
         result = await self._menu.select_item(
@@ -37,6 +39,8 @@ class SelectMenuTests(unittest.IsolatedAsyncioTestCase):
     def test_escape_cancels_selection_and_resets_menu_state(self) -> None:
         self._menu._kb = KeyBindings()
         self._menu._items = ["First", "Second"]
+        self._menu._descriptions = ["one", "two"]
+        self._menu._header = "Name  Created"
         self._menu._highlighted_idx = 1
         self._menu._bind_keys()
         event = Mock()
@@ -49,8 +53,21 @@ class SelectMenuTests(unittest.IsolatedAsyncioTestCase):
         escape_binding.handler(event)
 
         self.assertEqual(self._menu._items, [])
+        self.assertEqual(self._menu._descriptions, [])
+        self.assertIsNone(self._menu._header)
         self.assertEqual(self._menu._highlighted_idx, 0)
         event.app.exit.assert_called_once_with(result=None)
+
+    def test_rendering_aligns_items_and_descriptions(self) -> None:
+        self._menu._items = ["Short", "Longer"]
+        self._menu._descriptions = ["first", "second"]
+        self._menu._highlighted_idx = 0
+
+        formatted_text = self._menu._get_list().__pt_formatted_text__()
+        visible_text = "".join(text for _, text in formatted_text)
+
+        self.assertIn("> Short   first", visible_text)
+        self.assertIn("  Longer  second", visible_text)
 
 
 if __name__ == "__main__":

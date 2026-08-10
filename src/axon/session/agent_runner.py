@@ -51,15 +51,25 @@ class AgentRunner:
         }
 
 
-    def _record_tool_denial(self, tool_name: str, tool_args: dict[str, Any]) -> None:
-        self._llm.add_tool_call_history(tool_name, tool_args)
+    def _record_tool_denial(
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        provider_metadata: dict[str, Any] | None,
+    ) -> None:
+        self._llm.add_tool_call_history(
+            tool_name,
+            tool_args,
+            provider_metadata,
+        )
         self._llm.add_tool_response_history(
             tool_name,
             (
                 f"User denied permission to execute {tool_name} this time. "
                 "Respond without this tool if possible or try to use another tool. "
                 "Do not claim you are unable to help just because this tool was denied."
-            )
+            ),
+            provider_metadata,
         )
 
 
@@ -67,17 +77,28 @@ class AgentRunner:
         self,
         tool_name: str,
         tool_args: dict[str, Any],
-        user_input: str
+        user_input: str,
+        provider_metadata: dict[str, Any] | None,
     ) -> None:
-        self._llm.add_tool_call_history(tool_name, tool_args)
+        self._llm.add_tool_call_history(
+            tool_name,
+            tool_args,
+            provider_metadata,
+        )
         self._llm.add_tool_response_history(
             tool_name,
-            f"User interrupted execution of {tool_name} with a new message instead."
+            f"User interrupted execution of {tool_name} with a new message instead.",
+            provider_metadata,
         )
         self._llm.add_user_history(user_input)
 
 
-    def _confirm_tool_use(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
+    def _confirm_tool_use(
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        provider_metadata: dict[str, Any] | None,
+    ) -> bool:
         choice_descriptions = (
             f"{emphasis(CONFIRM_YES)} = yes once | "
             f"{emphasis(CONFIRM_TRUST)} = trust for session | "
@@ -97,18 +118,37 @@ class AgentRunner:
             return True
 
         if choice == CONFIRM_NO:
-            self._record_tool_denial(tool_name, tool_args)
+            self._record_tool_denial(
+                tool_name,
+                tool_args,
+                provider_metadata,
+            )
             return False
 
-        self._record_tool_interruption(tool_name, tool_args, choice_raw)
+        self._record_tool_interruption(
+            tool_name,
+            tool_args,
+            choice_raw,
+            provider_metadata,
+        )
         return False
 
 
-    def _record_unavailable_tool(self, tool_name: str, tool_args: dict[str, Any]) -> None:
-        self._llm.add_tool_call_history(tool_name, tool_args)
+    def _record_unavailable_tool(
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        provider_metadata: dict[str, Any] | None,
+    ) -> None:
+        self._llm.add_tool_call_history(
+            tool_name,
+            tool_args,
+            provider_metadata,
+        )
         self._llm.add_tool_response_history(
             tool_name,
-            f"Tool '{tool_name}' is not available."
+            f"Tool '{tool_name}' is not available.",
+            provider_metadata,
         )
 
 
@@ -116,6 +156,7 @@ class AgentRunner:
         self,
         tool_name: str,
         tool_args: dict[str, Any],
+        provider_metadata: dict[str, Any] | None,
         started_at: float,
     ) -> dict[str, Any]:
         self._ui.progress(f"Agent executing: {emphasis(tool_name)}.")
@@ -126,8 +167,16 @@ class AgentRunner:
         self._ui.display_tool_output(tool_name, results)
 
         result_content = results[TOOL_RESULTS.CONTENT] or "No results returned"
-        self._llm.add_tool_call_history(tool_name, tool_args)
-        self._llm.add_tool_response_history(tool_name, result_content)
+        self._llm.add_tool_call_history(
+            tool_name,
+            tool_args,
+            provider_metadata,
+        )
+        self._llm.add_tool_response_history(
+            tool_name,
+            result_content,
+            provider_metadata,
+        )
 
         return results
 
@@ -139,20 +188,30 @@ class AgentRunner:
     ) -> dict[int, dict[str, str | int]]:
         tool_name = tool_call[LLM_CONTRACT.NAME]
         tool_args = tool_call[LLM_CONTRACT.ARGS]
+        provider_metadata = tool_call.get(LLM_CONTRACT.PROVIDER_METADATA)
 
         if tool_name not in self._tool_functions:
-            self._record_unavailable_tool(tool_name, tool_args)
+            self._record_unavailable_tool(
+                tool_name,
+                tool_args,
+                provider_metadata,
+            )
             return {}
 
         self._ui.display_tool_args(tool_name, tool_args)
         if tool_name not in self._trusted_tools:
-            proceed = self._confirm_tool_use(tool_name, tool_args)
+            proceed = self._confirm_tool_use(
+                tool_name,
+                tool_args,
+                provider_metadata,
+            )
             if not proceed:
                 return {}
 
         results = self._execute_tool(
             tool_name,
             tool_args,
+            provider_metadata,
             started_at,
         )
         return results.get(TOOL_RESULTS.RAW_CHUNKS) or {}

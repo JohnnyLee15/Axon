@@ -11,6 +11,7 @@ class LLMContract:
     NAME = "name"
     ARGS = "args"
     RESULT = "result"
+    PROVIDER_METADATA = "provider_metadata"
 
     # Generation response keys
     TOOL_CALLS = "tool_calls"

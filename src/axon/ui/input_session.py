@@ -7,7 +7,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.application import Application
-from prompt_toolkit.filters import has_completions, is_done
+from prompt_toolkit.filters import Condition, has_completions, is_done
 from prompt_toolkit.layout import (
     BufferControl,
     ConditionalContainer,
@@ -26,12 +26,18 @@ from .theme import PROMPT_STYLE
 
 
 USER_INPUT_VERTICAL_PADDING = 1
+RESIZE_NOTICE = (
+    "Terminal resized — previous output was cleared from the screen only. "
+    "Conversation history is unchanged. Run /chat history to reprint it.\n"
+)
 
 
 class InputSession:
     def __init__(self, command_options: dict[str, str], history_path: Path) -> None:
         self._prompt_text = ANSI("")
         self._status_text = ""
+        self._resize_notice_text = ""
+        self._terminal_size = None
 
         self._input_completer = InputCompleter(command_options)
         self._buffer = Buffer(
@@ -52,6 +58,7 @@ class InputSession:
             key_bindings=self._key_bindings,
             style=PROMPT_STYLE,
             full_screen=False,
+            before_render=self._handle_terminal_resize,
         )
 
 
@@ -76,6 +83,32 @@ class InputSession:
 
     def _get_status_text(self) -> str:
         return self._status_text
+
+
+    def _get_resize_notice_text(self) -> str:
+        return self._resize_notice_text
+
+
+    def _has_resize_notice(self) -> bool:
+        return bool(self._resize_notice_text)
+
+
+    def _handle_terminal_resize(
+        self,
+        application: Application[str],
+    ) -> None:
+        terminal_size = application.output.get_size()
+
+        if self._terminal_size is None:
+            self._terminal_size = terminal_size
+            return
+
+        if terminal_size == self._terminal_size:
+            return
+
+        self._terminal_size = terminal_size
+        self._resize_notice_text = RESIZE_NOTICE
+        application.renderer.clear()
 
 
     def _accept_input(self, buffer: Buffer) -> bool:
@@ -243,9 +276,24 @@ class InputSession:
         )
 
 
+    def _create_resize_notice(self) -> ConditionalContainer:
+        return ConditionalContainer(
+            content=Window(
+                content=FormattedTextControl(
+                    self._get_resize_notice_text
+                ),
+                wrap_lines=True,
+                dont_extend_height=True,
+                style="class:resize-notice",
+            ),
+            filter=Condition(self._has_resize_notice) & ~is_done,
+        )
+
+
     def _create_layout(self) -> Layout:
         root_container = HSplit(
             [
+                self._create_resize_notice(),
                 self._create_user_input_container(),
                 self._create_status_line(),
                 self._create_command_menu(),
@@ -262,6 +310,7 @@ class InputSession:
     async def prompt(self, prompt_text: str, status_text: str) -> str:
         self._prompt_text = ANSI(prompt_text)
         self._status_text = status_text
+        self._resize_notice_text = ""
         self._buffer.reset()
 
         return await self._application.run_async()

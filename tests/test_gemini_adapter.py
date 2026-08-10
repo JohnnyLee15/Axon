@@ -1,10 +1,20 @@
+import base64
+import json
 import unittest
 from unittest.mock import AsyncMock, Mock
 
+from google.genai import types
 from google.genai.errors import APIError
 
+from axon.llm.contracts import LLM_CONTRACT
 from axon.llm.errors import InvalidCredentialsError
-from axon.llm.gemini_adapter import GeminiAdapter
+from axon.llm.gemini_adapter import (
+    FUNCTION_CALL_ID_KEY,
+    GEMINI_METADATA_KEY,
+    THOUGHT_SIGNATURE_KEY,
+    GeminiAdapter,
+)
+from axon.llm.history import tool_call, tool_response
 
 
 class GeminiAdapterCredentialTests(unittest.TestCase):
@@ -115,6 +125,68 @@ class GeminiAdapterGenerationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(
             self._adapter._execute_with_retries_async.await_args.kwargs["api_func"],
             self._adapter._client.aio.models.generate_content,
+        )
+
+    async def test_tool_metadata_survives_history_round_trip(self) -> None:
+        signature = b"encrypted-thought-signature"
+        call_id = "function-call-123"
+        response = types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(
+                    content=types.Content(
+                        role="model",
+                        parts=[
+                            types.Part(
+                                function_call=types.FunctionCall(
+                                    id=call_id,
+                                    name="execute_shell_cmd",
+                                    args={"cmd": "pwd"},
+                                ),
+                                thought_signature=signature,
+                            )
+                        ],
+                    )
+                )
+            ]
+        )
+        self._adapter._execute_with_retries_async.return_value = response
+
+        result = await self._adapter.generate_with_tools(
+            model="gemini-test",
+            contents=[],
+        )
+
+        extracted_call = result[LLM_CONTRACT.TOOL_CALLS][0]
+        metadata = extracted_call[LLM_CONTRACT.PROVIDER_METADATA]
+        gemini_metadata = metadata[GEMINI_METADATA_KEY]
+        self.assertEqual(gemini_metadata[FUNCTION_CALL_ID_KEY], call_id)
+        self.assertEqual(
+            gemini_metadata[THOUGHT_SIGNATURE_KEY],
+            base64.b64encode(signature).decode("ascii"),
+        )
+
+        history = [
+            tool_call(
+                extracted_call[LLM_CONTRACT.NAME],
+                extracted_call[LLM_CONTRACT.ARGS],
+                metadata,
+            ),
+            tool_response(
+                extracted_call[LLM_CONTRACT.NAME],
+                "command complete",
+                metadata,
+            ),
+        ]
+        json.dumps(history)
+        formatted_history = self._adapter._format_history(history)
+
+        call_part = formatted_history[0]["parts"][0]
+        response_part = formatted_history[1]["parts"][0]
+        self.assertEqual(call_part["thought_signature"], signature)
+        self.assertEqual(call_part["function_call"]["id"], call_id)
+        self.assertEqual(
+            response_part["function_response"]["id"],
+            call_id,
         )
 
     def test_generate_json_keeps_using_sync_client(self) -> None:

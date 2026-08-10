@@ -5,10 +5,50 @@ from unittest.mock import AsyncMock, Mock, patch
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 
-from axon.ui.input_session import InputSession
+from axon.ui.input_session import InputSession, RESIZE_NOTICE
 
 
 class InputSessionTests(unittest.IsolatedAsyncioTestCase):
+    def test_first_render_records_terminal_size_without_clearing(self) -> None:
+        session = InputSession.__new__(InputSession)
+        session._terminal_size = None
+        session._resize_notice_text = ""
+        application = Mock()
+        terminal_size = SimpleNamespace(rows=30, columns=80)
+        application.output.get_size.return_value = terminal_size
+
+        session._handle_terminal_resize(application)
+
+        self.assertEqual(session._terminal_size, terminal_size)
+        self.assertEqual(session._resize_notice_text, "")
+        application.renderer.clear.assert_not_called()
+
+    def test_resize_clears_screen_and_preserves_history_message(self) -> None:
+        session = InputSession.__new__(InputSession)
+        session._terminal_size = SimpleNamespace(rows=30, columns=80)
+        session._resize_notice_text = ""
+        application = Mock()
+        new_size = SimpleNamespace(rows=30, columns=100)
+        application.output.get_size.return_value = new_size
+
+        session._handle_terminal_resize(application)
+
+        self.assertEqual(session._terminal_size, new_size)
+        self.assertEqual(session._resize_notice_text, RESIZE_NOTICE)
+        application.renderer.clear.assert_called_once_with()
+
+    def test_unchanged_terminal_size_does_not_clear_screen(self) -> None:
+        session = InputSession.__new__(InputSession)
+        terminal_size = SimpleNamespace(rows=30, columns=80)
+        session._terminal_size = terminal_size
+        session._resize_notice_text = ""
+        application = Mock()
+        application.output.get_size.return_value = terminal_size
+
+        session._handle_terminal_resize(application)
+
+        application.renderer.clear.assert_not_called()
+
     def test_ctrl_j_is_bound_to_multiline_input(self) -> None:
         session = InputSession.__new__(InputSession)
         session._key_bindings = KeyBindings()
@@ -114,6 +154,7 @@ class InputSessionTests(unittest.IsolatedAsyncioTestCase):
         session._buffer = Mock()
         session._application = Mock()
         session._application.run_async = AsyncMock(return_value="hello")
+        session._resize_notice_text = "old notice"
 
         result = await session.prompt(
             prompt_text="[You] > ",
@@ -122,6 +163,7 @@ class InputSessionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, "hello")
         self.assertEqual(session._get_status_text(), "  gemini-test  •  ~/Axon")
+        self.assertEqual(session._resize_notice_text, "")
         session._buffer.reset.assert_called_once_with()
         session._application.run_async.assert_awaited_once_with()
 
