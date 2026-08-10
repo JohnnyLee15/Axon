@@ -131,3 +131,7 @@ class Prompt:
                 display_text += char
                 live.update(Markdown(display_text))
                 time.sleep(0.001)
+
+
+    def clear_screen(self) -> None:
+        self._input_session.clear_screen()

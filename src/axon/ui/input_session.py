@@ -26,6 +26,7 @@ from .theme import PROMPT_STYLE
 
 
 USER_INPUT_VERTICAL_PADDING = 1
+ERASE_SCROLLBACK_SEQUENCE = "\033[3J"
 RESIZE_NOTICE = (
     "Terminal resized — previous output was cleared from the screen only. "
     "Conversation history is unchanged. Run /chat history to reprint it.\n"
@@ -108,7 +109,28 @@ class InputSession:
 
         self._terminal_size = terminal_size
         self._resize_notice_text = RESIZE_NOTICE
-        application.renderer.clear()
+        self._clear_terminal(application, invalidate=False)
+
+
+    def _clear_terminal(
+        self,
+        application: Application[str],
+        *,
+        invalidate: bool = True,
+    ) -> None:
+        output = application.output
+        output.erase_screen()
+        output.write_raw(ERASE_SCROLLBACK_SEQUENCE)
+        output.cursor_goto(0, 0)
+        output.flush()
+
+        application.renderer.reset()
+        if invalidate:
+            application.invalidate()
+
+
+    def _clear_screen(self, event: KeyPressEvent) -> None:
+        self._clear_terminal(event.app)
 
 
     def _accept_input(self, buffer: Buffer) -> bool:
@@ -207,6 +229,7 @@ class InputSession:
 
         self._key_bindings.add("c-c")(self._interrupt)
         self._key_bindings.add("c-d")(self._handle_eof)
+        self._key_bindings.add("c-l")(self._clear_screen)
 
 
     def _get_prompt_text(self) -> ANSI:
@@ -314,3 +337,7 @@ class InputSession:
         self._buffer.reset()
 
         return await self._application.run_async()
+
+
+    def clear_screen(self) -> None:
+        self._clear_terminal(self._application)

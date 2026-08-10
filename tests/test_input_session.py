@@ -31,11 +31,12 @@ class InputSessionTests(unittest.IsolatedAsyncioTestCase):
         new_size = SimpleNamespace(rows=30, columns=100)
         application.output.get_size.return_value = new_size
 
-        session._handle_terminal_resize(application)
+        with patch.object(session, "_clear_terminal") as clear_terminal:
+            session._handle_terminal_resize(application)
 
         self.assertEqual(session._terminal_size, new_size)
         self.assertEqual(session._resize_notice_text, RESIZE_NOTICE)
-        application.renderer.clear.assert_called_once_with()
+        clear_terminal.assert_called_once_with(application, invalidate=False)
 
     def test_unchanged_terminal_size_does_not_clear_screen(self) -> None:
         session = InputSession.__new__(InputSession)
@@ -61,7 +62,21 @@ class InputSessionTests(unittest.IsolatedAsyncioTestCase):
         }
         self.assertIn((Keys.ControlJ,), key_sequences)
         self.assertIn((Keys.ControlI,), key_sequences)
+        self.assertIn((Keys.ControlL,), key_sequences)
         self.assertNotIn((Keys.Escape, Keys.ControlM), key_sequences)
+
+    def test_clear_terminal_resets_renderer_and_clears_scrollback(self) -> None:
+        session = InputSession.__new__(InputSession)
+        application = Mock()
+
+        session._clear_terminal(application)
+
+        application.output.erase_screen.assert_called_once_with()
+        application.output.write_raw.assert_called_once_with("\033[3J")
+        application.output.cursor_goto.assert_called_once_with(0, 0)
+        application.output.flush.assert_called_once_with()
+        application.renderer.reset.assert_called_once_with()
+        application.invalidate.assert_called_once_with()
 
     def test_tab_applies_default_completion(self) -> None:
         session = InputSession.__new__(InputSession)

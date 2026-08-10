@@ -86,7 +86,7 @@ class AxonUI:
 
 
     def clear_screen(self) -> None:
-        self._console.clear()
+        self._prompt.clear_screen()
         self._suppress_next_prompt_newline = True
 
 

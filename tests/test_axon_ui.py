@@ -23,7 +23,7 @@ class AxonUITests(unittest.IsolatedAsyncioTestCase):
             model_name="gemini-test",
         )
 
-        self._ui._console.clear.assert_called_once_with()
+        self._ui._prompt.clear_screen.assert_called_once_with()
         self._ui._console.print.assert_not_called()
 
         await self._ui.listen(
