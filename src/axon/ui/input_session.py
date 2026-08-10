@@ -2,7 +2,6 @@ from pathlib import Path
 
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
@@ -22,6 +21,7 @@ from prompt_toolkit.layout.processors import BeforeInput
 from prompt_toolkit.layout.controls import FormattedTextControl
 
 from .command_menu import CommandMenuControl, MAX_VISIBLE_COMMANDS
+from .input_completer import InputCompleter
 from .theme import PROMPT_STYLE
 
 
@@ -33,12 +33,9 @@ class InputSession:
         self._prompt_text = ANSI("")
         self._status_text = ""
 
+        self._input_completer = InputCompleter(command_options)
         self._buffer = Buffer(
-            completer=WordCompleter(
-                list(command_options),
-                sentence=True,
-                meta_dict=command_options,
-            ),
+            completer=self._input_completer,
             complete_while_typing=True,
             history=FileHistory(str(history_path)),
             multiline=True,
@@ -112,8 +109,27 @@ class InputSession:
             self._buffer.go_to_completion(0)
 
 
+    def _apply_completion(self, event: KeyPressEvent) -> None:
+        buffer = event.current_buffer
+        completion_state = buffer.complete_state
+        if completion_state is None:
+            buffer.start_completion(select_first=True)
+            return
+
+        if not completion_state.completions:
+            return
+
+        completion_index = completion_state.complete_index or 0
+        completion = completion_state.completions[completion_index]
+        buffer.apply_completion(completion)
+
+
     def _submit(self, event: KeyPressEvent) -> None:
-        self._select_default_completion()
+        if not self._input_completer.is_path_input(
+            event.current_buffer.document
+        ):
+            self._select_default_completion()
+
         event.current_buffer.validate_and_handle()
 
 
@@ -143,6 +159,7 @@ class InputSession:
 
     def _bind_keys(self) -> None:
         self._key_bindings.add("enter")(self._submit)
+        self._key_bindings.add("tab")(self._apply_completion)
         self._key_bindings.add("c-j")(self._insert_newline)
 
         self._key_bindings.add(

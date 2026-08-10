@@ -1,5 +1,6 @@
-from typing import Any, Callable
 import inspect
+import shlex
+from typing import Any, Callable
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
@@ -43,7 +44,11 @@ class CommandProcessor:
 
 
     def _resolve_command(self, cmd: str) -> tuple[dict[str, Any] | None, list[str]]:
-        parts = cmd.lstrip(CMD_START_CHAR).split()
+        try:
+            parts = shlex.split(cmd.lstrip(CMD_START_CHAR))
+        except ValueError:
+            return None, []
+
         if not parts:
             return None, []
 

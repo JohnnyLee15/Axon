@@ -47,7 +47,7 @@ class CommandMenuControl(UIControl):
             command_style = "class:command-menu.item"
             description_style = "class:command-menu.description"
 
-        command = completion.text.ljust(self._command_width)
+        command = completion.display_text.ljust(self._command_width)
         description = completion.display_meta_text
         return [
             (command_style, command),
@@ -80,7 +80,7 @@ class CommandMenuControl(UIControl):
         ]
 
         self._command_width = max(
-            len(completion.text)
+            len(completion.display_text)
             for completion in self._visible_completions
         )
 

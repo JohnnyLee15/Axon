@@ -20,7 +20,73 @@ class InputSessionTests(unittest.IsolatedAsyncioTestCase):
             for binding in session._key_bindings.bindings
         }
         self.assertIn((Keys.ControlJ,), key_sequences)
+        self.assertIn((Keys.ControlI,), key_sequences)
         self.assertNotIn((Keys.Escape, Keys.ControlM), key_sequences)
+
+    def test_tab_applies_default_completion(self) -> None:
+        session = InputSession.__new__(InputSession)
+        completion = Mock()
+        event = Mock()
+        event.current_buffer.complete_state = SimpleNamespace(
+            complete_index=None,
+            completions=[completion],
+        )
+
+        session._apply_completion(event)
+
+        event.current_buffer.apply_completion.assert_called_once_with(
+            completion
+        )
+
+    def test_tab_applies_selected_completion(self) -> None:
+        session = InputSession.__new__(InputSession)
+        completions = [Mock(), Mock()]
+        event = Mock()
+        event.current_buffer.complete_state = SimpleNamespace(
+            complete_index=1,
+            completions=completions,
+        )
+
+        session._apply_completion(event)
+
+        event.current_buffer.apply_completion.assert_called_once_with(
+            completions[1]
+        )
+
+    def test_tab_starts_completion_when_no_options_are_loaded(self) -> None:
+        session = InputSession.__new__(InputSession)
+        event = Mock()
+        event.current_buffer.complete_state = None
+
+        session._apply_completion(event)
+
+        event.current_buffer.start_completion.assert_called_once_with(
+            select_first=True,
+        )
+
+    def test_submit_does_not_apply_default_path_completion(self) -> None:
+        session = InputSession.__new__(InputSession)
+        session._input_completer = Mock()
+        session._input_completer.is_path_input.return_value = True
+        session._select_default_completion = Mock()
+        event = Mock()
+
+        session._submit(event)
+
+        session._select_default_completion.assert_not_called()
+        event.current_buffer.validate_and_handle.assert_called_once_with()
+
+    def test_submit_still_applies_default_command_completion(self) -> None:
+        session = InputSession.__new__(InputSession)
+        session._input_completer = Mock()
+        session._input_completer.is_path_input.return_value = False
+        session._select_default_completion = Mock()
+        event = Mock()
+
+        session._submit(event)
+
+        session._select_default_completion.assert_called_once_with()
+        event.current_buffer.validate_and_handle.assert_called_once_with()
 
     def test_user_input_height_uses_wrapped_window_height_and_padding(self) -> None:
         session = InputSession.__new__(InputSession)

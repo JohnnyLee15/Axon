@@ -104,6 +104,32 @@ class CommandMenuControlTests(unittest.TestCase):
 
         self.assertEqual(height, 5)
 
+    def test_displays_completion_label_instead_of_inserted_suffix(self) -> None:
+        state = SimpleNamespace(
+            completions=[
+                Completion(
+                    text="pers",
+                    display="papers/",
+                )
+            ],
+            complete_index=None,
+        )
+        control = CommandMenuControl()
+
+        with patch(
+            "axon.ui.command_menu.get_app",
+            return_value=self._app_with_state(state),
+        ):
+            content = control.create_content(80, MAX_VISIBLE_COMMANDS)
+
+        self.assertEqual(
+            content.get_line(0),
+            [
+                (CURRENT_STYLE, "papers/"),
+                (CURRENT_DESCRIPTION_STYLE, "  "),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
