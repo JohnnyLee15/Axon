@@ -9,19 +9,3 @@ GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
 DEFAULT_CHAT_MODEL = GEMINI_3_5_FLASH
 CHAT_UTILITY_MODEL = GEMINI_3_5_FLASH
 INGESTION_MODEL = GEMINI_3_1_FLASH_LITE
-
-MODEL_OPTIONS = [
-    {"id": GEMINI_2_5_FLASH_LITE, "label": f"{GEMINI_2_5_FLASH_LITE} (cheapest | retires Oct 2026)"},
-    {"id": GEMINI_3_1_FLASH_LITE, "label": f"{GEMINI_3_1_FLASH_LITE} (budget | stable)"},
-    {"id": GEMINI_2_5_FLASH, "label": f"{GEMINI_2_5_FLASH} (low cost | retires Oct 2026)"},
-    {"id": GEMINI_3_FLASH_PREVIEW, "label": f"{GEMINI_3_FLASH_PREVIEW} (mid cost | preview)"},
-    {"id": GEMINI_3_5_FLASH, "label": f"{GEMINI_3_5_FLASH} (recommended | stable)"},
-    {"id": GEMINI_2_5_PRO, "label": f"{GEMINI_2_5_PRO} (high cost | retires Oct 2026)"},
-    {"id": GEMINI_3_1_PRO_PREVIEW, "label": f"{GEMINI_3_1_PRO_PREVIEW} (highest cost | preview)"},
-]
-
-GEMINI_PROVIDER = "gemini"
-
-PROVIDER_TO_API_KEY_ENV_VAR = {
-    GEMINI_PROVIDER: "GEMINI_API_KEY",
-}

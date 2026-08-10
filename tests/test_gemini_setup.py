@@ -3,7 +3,7 @@ from unittest.mock import Mock, call, patch
 
 from axon.llm.errors import InvalidCredentialsError
 from axon.llm.gemini_setup import setup_gemini
-from axon.llm.models import GEMINI_PROVIDER, PROVIDER_TO_API_KEY_ENV_VAR
+from axon.llm.providers import GEMINI_PROVIDER, PROVIDER_TO_API_KEY_ENV_VAR
 
 
 FACTORY_PATH = "axon.llm.gemini_setup.create_llm_adapter"

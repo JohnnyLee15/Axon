@@ -2,7 +2,7 @@ from axon.ui.axon_ui import AxonUI
 
 from .llm_adapter import LLMAdapter
 from .gemini_adapter import GeminiAdapter
-from .models import GEMINI_PROVIDER
+from .providers import GEMINI_PROVIDER
 
 
 def create_llm_adapter(

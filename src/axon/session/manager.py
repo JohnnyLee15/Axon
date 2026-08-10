@@ -11,6 +11,7 @@ from axon.db.min_hasher import MinHasher
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
+from axon.ui.contracts import OPTION_ID_KEY
 
 from axon.ingestion.ingestion_runner import IngestionRunner
 from axon.ingestion.semantic_chunker import SemanticChunker
@@ -25,7 +26,7 @@ from axon.agent.library_search_tool import LibrarySearchTool
 
 from axon.llm.chat_llm import ChatLLM
 from axon.llm.llm_adapter import LLMAdapter
-from axon.llm.models import MODEL_OPTIONS, DEFAULT_CHAT_MODEL
+from axon.llm.models import DEFAULT_CHAT_MODEL
 from axon.llm.settings import DEFAULT_CONTEXT_SIZE
 
 from axon.config.settings_store import (
@@ -39,6 +40,7 @@ from .library_handlers import LibraryHandlers
 from .query_runner import QueryRunner
 from .agent_runner import AgentRunner
 from .reference_presenter import ReferencePresenter
+from .options import CHAT_LIMIT_OPTIONS, MODEL_OPTIONS
 
 
 class SessionManager:
@@ -55,8 +57,8 @@ class SessionManager:
         self._llm = ChatLLM(
             ui=self._ui,
             llm_adapter=self._llm_adapter,
-            chat_model=self._settings.get(CHAT_MODEL_KEY) or DEFAULT_CHAT_MODEL,
-            context_size=self._settings.get(CHAT_LIMIT_KEY) or DEFAULT_CONTEXT_SIZE,
+            chat_model=self._get_saved_chat_model(),
+            context_size=self._get_saved_chat_limit(),
         )
 
         self._init_database()
@@ -165,6 +167,24 @@ class SessionManager:
             handlers=self._command_handlers,
             ui=self._ui,
         )
+
+
+    def _get_saved_chat_model(self) -> str:
+        model_options = [option[OPTION_ID_KEY] for option in MODEL_OPTIONS]
+        saved_model = self._settings.get(CHAT_MODEL_KEY)
+        if saved_model in model_options:
+            return saved_model
+
+        return DEFAULT_CHAT_MODEL
+
+
+    def _get_saved_chat_limit(self) -> int:
+        chat_limit_options = [option[OPTION_ID_KEY] for option in CHAT_LIMIT_OPTIONS]
+        saved_limit = self._settings.get(CHAT_LIMIT_KEY)
+        if saved_limit in chat_limit_options:
+            return saved_limit
+
+        return DEFAULT_CONTEXT_SIZE
 
 
     def _help(self) -> None:

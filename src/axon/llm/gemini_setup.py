@@ -4,7 +4,7 @@ from axon.llm.errors import InvalidCredentialsError
 
 from .llm_adapter import LLMAdapter
 from .factory import create_llm_adapter
-from .models import (
+from .providers import (
     PROVIDER_TO_API_KEY_ENV_VAR,
     GEMINI_PROVIDER,
 )

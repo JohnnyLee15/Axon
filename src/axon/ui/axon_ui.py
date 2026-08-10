@@ -9,9 +9,7 @@ from .prompt import Prompt
 from .tool_renderers import ToolRenderers
 from .views import Views
 from .messages import Messages
-
-OPTION_ID_KEY = "id"
-OPTION_LABEL_KEY = "label"
+from .contracts import OPTION_ID_KEY, OPTION_LABEL_KEY
 
 
 class AxonUI:

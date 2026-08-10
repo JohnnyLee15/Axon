@@ -8,15 +8,7 @@ from axon.commands.flags import OVERWRITE_CHAT_FLAG, DELETE_ALL_CHATS_FLAG
 from axon.ui.choices import CONFIRM_NO, CONFIRM_YES
 from axon.config.settings_store import SettingsStore, CHAT_LIMIT_KEY
 
-
-CHAT_LIMIT_OPTIONS = [
-    {"id": 10000, "label": "10,000 (small)"},
-    {"id": 20000, "label": "20,000 (short)"},
-    {"id": 50000, "label": "50,000 (medium)"},
-    {"id": 100000, "label": "100,000 (large)"},
-    {"id": 200000, "label": "200,000 (huge)"},
-    {"id": 750000, "label": "750,000 (max)"}
-]
+from .options import CHAT_LIMIT_OPTIONS
 
 
 class ChatHandlers:

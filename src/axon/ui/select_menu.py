@@ -7,6 +7,10 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .theme import ANSI_COLOURS, theme_colour
 
+
+ESCAPE_KEY_TIMEOUT_SECONDS = 0.05
+
+
 class SelectMenu:
     def __init__(self):
         self._highlighted_idx = 0
@@ -24,6 +28,8 @@ class SelectMenu:
             full_screen=False,
             erase_when_done=True
         )
+
+        self._app.ttimeoutlen = ESCAPE_KEY_TIMEOUT_SECONDS
 
 
     def _get_list(self) -> ANSI:

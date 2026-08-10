@@ -1,0 +1,2 @@
+OPTION_ID_KEY = "id"
+OPTION_LABEL_KEY = "label"
