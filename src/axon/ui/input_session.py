@@ -230,8 +230,6 @@ class InputSession:
         )
 
 
-
-
     def prompt(self, prompt_text: str, status_text: str) -> str:
         self._prompt_text = ANSI(prompt_text)
         self._status_text = status_text

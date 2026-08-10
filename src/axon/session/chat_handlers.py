@@ -6,6 +6,7 @@ from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
 from axon.commands.flags import OVERWRITE_CHAT_FLAG, DELETE_ALL_CHATS_FLAG
 from axon.ui.choices import CONFIRM_NO, CONFIRM_YES
+from axon.config.settings_store import SettingsStore, CHAT_LIMIT_KEY
 
 
 CHAT_LIMIT_OPTIONS = [
@@ -23,11 +24,13 @@ class ChatHandlers:
         self,
         chat_repository: ChatRepository,
         llm: ChatLLM,
-        ui: AxonUI
+        ui: AxonUI,
+        settings: SettingsStore,
     ) -> None:
         self._chat_repository = chat_repository
         self._llm = llm
         self._ui = ui
+        self._settings = settings
 
 
     def save_chat(self, name: str, flag: str | None = None) -> None:
@@ -141,8 +144,16 @@ class ChatHandlers:
 
 
     def set_limit(self) -> None:
-        selected_limit = self._ui.select_option(CHAT_LIMIT_OPTIONS)
+        selected_limit = self._ui.select_item(
+            options=CHAT_LIMIT_OPTIONS,
+            selected_id=self._llm.get_chat_limit(),
+        )
+
+        if selected_limit is None:
+            return
+
         self._llm.set_chat_limit(selected_limit)
+        self._settings.set(key=CHAT_LIMIT_KEY, value=selected_limit)
         self._ui.info(f"Chat Context Limit: {emphasis(selected_limit)}.")
 
 

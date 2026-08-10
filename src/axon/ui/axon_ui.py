@@ -48,14 +48,29 @@ class AxonUI:
         self._suppress_next_prompt_newline = True
 
 
-    def select_option(self, options: list[dict[str, Any]]) -> str:
+    def select_item(
+        self,
+        options: list[dict[str, Any]],
+        selected_id: Any | None = None,
+    ) -> Any | None:
         labels = [option[OPTION_LABEL_KEY] for option in options]
+
+        id_to_label = {
+            option[OPTION_ID_KEY]: option[OPTION_LABEL_KEY]
+            for option in options
+        }
+
         label_to_id = {
             option[OPTION_LABEL_KEY]: option[OPTION_ID_KEY]
             for option in options
         }
-        selected_label = self._select_menu.select_item(labels)
-        return label_to_id[selected_label]
+
+        selected_label = self._select_menu.select_item(
+            labels,
+            selected_item=id_to_label.get(selected_id),
+        )
+
+        return label_to_id.get(selected_label)
 
 
     def listen(
@@ -89,6 +104,10 @@ class AxonUI:
 
     def display_tool_args(self, tool_name: str, args: dict) -> None:
         self._tool_renderers.display_tool_args(tool_name, args)
+
+
+    def display_goodbye(self) -> None:
+        self.info("Shutting down Axon. Goodbye!")
 
 
     def info(self, text: str, leading_blank: bool = True) -> None:

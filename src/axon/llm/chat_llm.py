@@ -4,17 +4,15 @@ from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis, dim
 
 from .llm_adapter import LLMAdapter
-from .models import DEFAULT_CHAT_MODEL, CHAT_UTILITY_MODEL
+from .models import CHAT_UTILITY_MODEL
 from .prompts import AXON_SYSTEM_PROMPT, REWRITE_SYSTEM_PROMPT, COMPACT_SYSTEM_PROMPT
 from .settings import (
-    DEFAULT_CONTEXT_SIZE,
     CHAT_TEMPERATURE,
     COMPACT_TEMPERATURE,
     REWRITE_HISTORY_LIMIT,
     REWRITE_TEMPERATURE,
     ROLLING_HISTORY_LIMIT,
 )
-from .contracts import LLM_CONTRACT
 from .history import (
     user_message,
     model_message,
@@ -26,9 +24,15 @@ from .history import (
 
 
 class ChatLLM:
-    def __init__(self, ui: AxonUI, llm_adapter: LLMAdapter):
-        self._chat_model = DEFAULT_CHAT_MODEL
-        self._context_size = DEFAULT_CONTEXT_SIZE
+    def __init__(
+        self,
+        ui: AxonUI,
+        llm_adapter: LLMAdapter,
+        chat_model: str,
+        context_size: int,
+    ):
+        self._chat_model = chat_model
+        self._context_size = context_size
         self._utility_model = CHAT_UTILITY_MODEL
         self._ui = ui
         self._llm_adapter = llm_adapter

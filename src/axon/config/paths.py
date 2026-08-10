@@ -9,6 +9,7 @@ DATA_DIR = AXON_HOME / "data"
 MODEL_CACHE_DIR = AXON_HOME / "models"
 ENV_PATH = AXON_HOME / ".env"
 PROMPT_HISTORY_PATH = DATA_DIR / "prompt_history"
+SETTINGS_JSON_PATH = AXON_HOME / "settings.json"
 
 
 def initialize_axon_home() -> None:

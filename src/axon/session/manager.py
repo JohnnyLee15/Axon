@@ -25,7 +25,14 @@ from axon.agent.library_search_tool import LibrarySearchTool
 
 from axon.llm.chat_llm import ChatLLM
 from axon.llm.llm_adapter import LLMAdapter
-from axon.llm.models import MODEL_OPTIONS
+from axon.llm.models import MODEL_OPTIONS, DEFAULT_CHAT_MODEL
+from axon.llm.settings import DEFAULT_CONTEXT_SIZE
+
+from axon.config.settings_store import (
+    CHAT_LIMIT_KEY,
+    CHAT_MODEL_KEY,
+    SettingsStore,
+)
 
 from .chat_handlers import ChatHandlers
 from .library_handlers import LibraryHandlers
@@ -39,11 +46,18 @@ class SessionManager:
         self,
         ui: AxonUI,
         llm_adapter: LLMAdapter,
+        settings: SettingsStore,
     ):
         self._agent_mode_enabled = False
+        self._settings = settings
         self._ui = ui
         self._llm_adapter = llm_adapter
-        self._llm = ChatLLM(self._ui, self._llm_adapter)
+        self._llm = ChatLLM(
+            ui=self._ui,
+            llm_adapter=self._llm_adapter,
+            chat_model=self._settings.get(CHAT_MODEL_KEY) or DEFAULT_CHAT_MODEL,
+            context_size=self._settings.get(CHAT_LIMIT_KEY) or DEFAULT_CONTEXT_SIZE,
+        )
 
         self._init_database()
         self._init_ingestion()
@@ -97,6 +111,7 @@ class SessionManager:
             chat_repository=self._chat_repository,
             llm=self._llm,
             ui=self._ui,
+            settings=self._settings,
         )
 
         self._library_handlers = LibraryHandlers(
@@ -161,7 +176,7 @@ class SessionManager:
 
 
     def _exit(self) -> CommandResult:
-        self._ui.info("Shutting down Axon. Goodbye!")
+        self._ui.display_goodbye()
         return CommandResult.EXIT
 
 
@@ -172,8 +187,16 @@ class SessionManager:
 
 
     def _select_model(self) -> None:
-        selected_model = self._ui.select_option(MODEL_OPTIONS)
+        selected_model = self._ui.select_item(
+            options=MODEL_OPTIONS,
+            selected_id=self._llm.get_chat_model(),
+        )
+
+        if selected_model is None:
+            return
+
         self._llm.set_chat_model(selected_model)
+        self._settings.set(key=CHAT_MODEL_KEY, value=selected_model)
         self._ui.info(f"Using Model: {emphasis(selected_model)}")
 
 
