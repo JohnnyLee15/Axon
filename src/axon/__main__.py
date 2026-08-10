@@ -1,4 +1,5 @@
 import sys
+import asyncio
 
 from axon.commands.completion import build_command_options
 from axon.commands.registry import COMMANDS
@@ -37,7 +38,7 @@ def main() -> None:
     )
 
     try:
-        manager.run()
+        asyncio.run(manager.run())
     except KeyboardInterrupt:
         ui.display_goodbye()
         sys.exit(130)

@@ -6,9 +6,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.formatted_text import ANSI
 
 from .theme import ANSI_COLOURS, theme_colour
-
-
-ESCAPE_KEY_TIMEOUT_SECONDS = 0.05
+from .settings import ESCAPE_KEY_TIMEOUT_SECONDS
 
 
 class SelectMenu:
@@ -70,7 +68,7 @@ class SelectMenu:
             event.app.exit(result=None)
 
 
-    def select_item(
+    async def select_item(
         self,
         items: list[str],
         selected_item: str | None = None,
@@ -85,4 +83,4 @@ class SelectMenu:
         else:
             self._highlighted_idx = 0
 
-        return self._app.run()
+        return await self._app.run_async()

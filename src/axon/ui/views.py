@@ -9,7 +9,13 @@ from rich import box
 from axon.commands.contracts import COMMAND_KEYS
 
 from .theme import STYLES, VIEW_EMOJIS
-from .formatters import strong, panel_title, dim, emphasis
+from .formatters import (
+    strong,
+    panel_title,
+    dim,
+    emphasis,
+    format_elapsed_time,
+)
 
 
 LOGO = """
@@ -27,7 +33,7 @@ LOGO = """
 WELCOME_MESSAGE = f"""Good to see you — let's skip the reading and get straight to the facts.
 Type {emphasis('/help')} at any time to see available commands.
 
-[dim](Tip: Enter to send | Esc + Enter for newline)[/dim]"""
+[dim](Tip: Enter to send | Ctrl + J for newline)[/dim]"""
 
 UNKNOWN_TITLE_STR = "Unknown Title"
 
@@ -148,3 +154,11 @@ class Views:
     def display_section(self, title: str) -> None:
         self._console.print()
         self._console.rule(emphasis(title), style=STYLES.STRONG)
+
+
+    def display_work_duration(self, total_seconds: int) -> None:
+        elapsed_text = format_elapsed_time(total_seconds)
+        self._console.print()
+        self._console.print(
+            Text(f"Worked for {elapsed_text}", style=STYLES.DIM)
+        )

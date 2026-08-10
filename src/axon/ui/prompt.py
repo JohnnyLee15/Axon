@@ -15,6 +15,7 @@ from axon.config.paths import PROMPT_HISTORY_PATH
 
 from .theme import ANSI_COLOURS, theme_colour, STYLES
 from .input_session import InputSession
+from .wait_status import WaitStatus
 
 
 CONTEXT_NOT_FULL_PERCENT = 65
@@ -72,7 +73,7 @@ class Prompt:
         return display_cwd
 
 
-    def listen(
+    async def listen(
         self,
         curr_tokens: int | None,
         context_size: int,
@@ -87,22 +88,34 @@ class Prompt:
         status_text = f"  {model_name}  •  {self._get_display_cwd()}"
         prompt_text = f"{p_text} {you_text} "
 
-        return self._input_session.prompt(
-            prompt_text=prompt_text,
-            status_text=status_text,
+        return (
+            await self._input_session.prompt(
+                prompt_text=prompt_text,
+                status_text=status_text,
+            )
         ).strip()
 
 
-    def wait(self) -> Live:
+    def wait(
+        self,
+        show_cancel_hint: bool = False,
+        started_at: float | None = None,
+    ) -> Live:
+        status = WaitStatus(
+            show_cancel_hint=show_cancel_hint,
+            started_at=started_at,
+        )
+
         renderable = Group(
             NewLine(),
-            Spinner("dots", text=Text("Thinking...", style=STYLES.STRONG), style=STYLES.STRONG)
+            Spinner("dots", text=status, style=STYLES.DIM),
         )
+
         return Live(
             renderable,
             console=self._console,
             transient=True,
-            refresh_per_second=REFRESH_RATE
+            refresh_per_second=REFRESH_RATE,
         )
 
 

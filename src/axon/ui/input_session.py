@@ -48,6 +48,8 @@ class InputSession:
         self._key_bindings = KeyBindings()
         self._bind_keys()
 
+        self._input_control = self._create_input_control()
+        self._input_window = self._create_input_window()
         self._application = Application[str](
             layout=self._create_layout(),
             key_bindings=self._key_bindings,
@@ -57,9 +59,22 @@ class InputSession:
 
 
     def _get_user_input_height(self) -> int:
-        input_lines = self._buffer.document.line_count
-        padding_lines = USER_INPUT_VERTICAL_PADDING * 2
-        return input_lines + padding_lines
+        terminal_size = get_app().output.get_size()
+
+        padding_height = USER_INPUT_VERTICAL_PADDING * 2
+        status_height = 1
+        max_input_height = max(
+            1,
+            terminal_size.rows - padding_height - status_height,
+        )
+
+        preferred_height = self._input_window.preferred_height(
+            width=terminal_size.columns,
+            max_available_height=max_input_height,
+        ).preferred
+
+        input_height = preferred_height or 1
+        return input_height + padding_height
 
 
     def _get_status_text(self) -> str:
@@ -128,7 +143,7 @@ class InputSession:
 
     def _bind_keys(self) -> None:
         self._key_bindings.add("enter")(self._submit)
-        self._key_bindings.add("escape", "enter")(self._insert_newline)
+        self._key_bindings.add("c-j")(self._insert_newline)
 
         self._key_bindings.add(
             "up",
@@ -165,21 +180,20 @@ class InputSession:
         )
 
 
-    def _create_user_input_container(
-        self,
-        input_control: BufferControl,
-    ) -> HSplit:
-        input_window = Window(
-            content=input_control,
+    def _create_input_window(self) -> Window:
+        return Window(
+            content=self._input_control,
             wrap_lines=True,
             dont_extend_height=True,
             style="class:user-input",
         )
 
+
+    def _create_user_input_container(self) -> HSplit:
         return HSplit(
             [
                 self._create_input_padding(),
-                input_window,
+                self._input_window,
                 self._create_input_padding(),
             ],
             align=VerticalAlign.TOP,
@@ -213,11 +227,9 @@ class InputSession:
 
 
     def _create_layout(self) -> Layout:
-        input_control = self._create_input_control()
-
         root_container = HSplit(
             [
-                self._create_user_input_container(input_control),
+                self._create_user_input_container(),
                 self._create_status_line(),
                 self._create_command_menu(),
             ],
@@ -226,13 +238,13 @@ class InputSession:
 
         return Layout(
             container=root_container,
-            focused_element=input_control,
+            focused_element=self._input_control,
         )
 
 
-    def prompt(self, prompt_text: str, status_text: str) -> str:
+    async def prompt(self, prompt_text: str, status_text: str) -> str:
         self._prompt_text = ANSI(prompt_text)
         self._status_text = status_text
         self._buffer.reset()
 
-        return self._application.run()
+        return await self._application.run_async()

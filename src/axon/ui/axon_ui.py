@@ -10,6 +10,7 @@ from .tool_renderers import ToolRenderers
 from .views import Views
 from .messages import Messages
 from .contracts import OPTION_ID_KEY, OPTION_LABEL_KEY
+from .interrupt_listener import InterruptListener
 
 
 class AxonUI:
@@ -22,6 +23,7 @@ class AxonUI:
         self._views = Views(self._console)
         self._messages = Messages(self._console)
         self._select_menu = SelectMenu()
+        self._interrupt_listener = InterruptListener()
         self._views.display_welcome()
 
 
@@ -46,7 +48,7 @@ class AxonUI:
         self._suppress_next_prompt_newline = True
 
 
-    def select_item(
+    async def select_item(
         self,
         options: list[dict[str, Any]],
         selected_id: Any | None = None,
@@ -63,7 +65,7 @@ class AxonUI:
             for option in options
         }
 
-        selected_label = self._select_menu.select_item(
+        selected_label = await self._select_menu.select_item(
             labels,
             selected_item=id_to_label.get(selected_id),
         )
@@ -71,7 +73,7 @@ class AxonUI:
         return label_to_id.get(selected_label)
 
 
-    def listen(
+    async def listen(
             self, curr_tokens: int | None,
             context_size: int,
             model_name: str,
@@ -81,15 +83,22 @@ class AxonUI:
         else:
             self._console.print()
 
-        return self._prompt.listen(
+        return await self._prompt.listen(
             curr_tokens=curr_tokens,
             context_size=context_size,
             model_name=model_name,
         )
 
 
-    def wait(self) -> Live:
-        return self._prompt.wait()
+    def wait(
+        self,
+        show_cancel_hint: bool = False,
+        started_at: float | None = None,
+    ) -> Live:
+        return self._prompt.wait(
+            show_cancel_hint=show_cancel_hint,
+            started_at=started_at,
+        )
 
 
     def stream_response(self, response: str) -> None:
@@ -106,6 +115,14 @@ class AxonUI:
 
     def display_goodbye(self) -> None:
         self.info("Shutting down Axon. Goodbye!")
+
+
+    def display_interrupted(self) -> None:
+        self.info("Response interrupted.")
+
+
+    def display_work_duration(self, total_seconds: int) -> None:
+        self._views.display_work_duration(total_seconds)
 
 
     def info(self, text: str, leading_blank: bool = True) -> None:
@@ -138,3 +155,7 @@ class AxonUI:
 
     def request_secret(self, text: str, leading_blank: bool = True) -> str:
         return self._messages.request_secret(text, leading_blank)
+
+
+    async def wait_for_interrupt(self) -> None:
+        await self._interrupt_listener.wait()

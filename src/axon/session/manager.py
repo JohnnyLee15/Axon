@@ -41,6 +41,7 @@ from .query_runner import QueryRunner
 from .agent_runner import AgentRunner
 from .reference_presenter import ReferencePresenter
 from .options import CHAT_LIMIT_OPTIONS, MODEL_OPTIONS
+from .interrupt_coordinator import InterruptCoordinator
 
 
 class SessionManager:
@@ -54,6 +55,8 @@ class SessionManager:
         self._settings = settings
         self._ui = ui
         self._llm_adapter = llm_adapter
+
+        self._interrupt_coordinator = InterruptCoordinator(self._ui)
         self._llm = ChatLLM(
             ui=self._ui,
             llm_adapter=self._llm_adapter,
@@ -114,6 +117,7 @@ class SessionManager:
             llm=self._llm,
             ui=self._ui,
             settings=self._settings,
+            interrupt_coordinator=self._interrupt_coordinator,
         )
 
         self._library_handlers = LibraryHandlers(
@@ -127,6 +131,7 @@ class SessionManager:
             ui=self._ui,
             library_search_tool=self._library_search_tool,
             reference_presenter=self._reference_presenter,
+            interrupt_coordinator=self._interrupt_coordinator,
         )
 
         self._agent_runner = AgentRunner(
@@ -134,6 +139,7 @@ class SessionManager:
             library_search_tool=self._library_search_tool,
             ui=self._ui,
             reference_presenter=self._reference_presenter,
+            interrupt_coordinator=self._interrupt_coordinator,
         )
 
 
@@ -206,8 +212,8 @@ class SessionManager:
         self._ui.info(f"Agent Mode successfully toggled {emphasis(status)}!")
 
 
-    def _select_model(self) -> None:
-        selected_model = self._ui.select_item(
+    async def _select_model(self) -> None:
+        selected_model = await self._ui.select_item(
             options=MODEL_OPTIONS,
             selected_id=self._llm.get_chat_model(),
         )
@@ -220,11 +226,11 @@ class SessionManager:
         self._ui.info(f"Using Model: {emphasis(selected_model)}")
 
 
-    def run(self) -> None:
+    async def run(self) -> None:
         should_exit = False
         while not should_exit:
-            curr_tokens = self._llm.get_token_count()
-            user_input = self._ui.listen(
+            curr_tokens = await self._llm.get_token_count()
+            user_input = await self._ui.listen(
                 curr_tokens=curr_tokens,
                 context_size=self._llm.get_chat_limit(),
                 model_name=self._llm.get_chat_model(),
@@ -233,11 +239,11 @@ class SessionManager:
                 continue
 
             if user_input.startswith("/"):
-                should_exit = self._command_processor.process(user_input)
+                should_exit = await self._command_processor.process(user_input)
                 continue
 
-            if self._agent_mode_enabled:
-                self._agent_runner.process_query(user_input)
+            if not self._agent_mode_enabled:
+                await self._query_runner.process_query(user_input)
                 continue
 
-            self._query_runner.process_query(user_input)
+            await self._agent_runner.process_query(user_input)

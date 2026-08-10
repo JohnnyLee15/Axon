@@ -9,6 +9,7 @@ from axon.ui.choices import CONFIRM_NO, CONFIRM_YES
 from axon.config.settings_store import SettingsStore, CHAT_LIMIT_KEY
 
 from .options import CHAT_LIMIT_OPTIONS
+from .interrupt_coordinator import InterruptCoordinator
 
 
 class ChatHandlers:
@@ -18,11 +19,13 @@ class ChatHandlers:
         llm: ChatLLM,
         ui: AxonUI,
         settings: SettingsStore,
+        interrupt_coordinator: InterruptCoordinator,
     ) -> None:
         self._chat_repository = chat_repository
         self._llm = llm
         self._ui = ui
         self._settings = settings
+        self._interrupt_coordinator = interrupt_coordinator
 
 
     def save_chat(self, name: str, flag: str | None = None) -> None:
@@ -135,8 +138,8 @@ class ChatHandlers:
         self._ui.info(f"Chat rolling successfully toggled {emphasis(status)}!")
 
 
-    def set_limit(self) -> None:
-        selected_limit = self._ui.select_item(
+    async def set_limit(self) -> None:
+        selected_limit = await self._ui.select_item(
             options=CHAT_LIMIT_OPTIONS,
             selected_id=self._llm.get_chat_limit(),
         )
@@ -155,9 +158,15 @@ class ChatHandlers:
         self._ui.info(f"Auto-compact successfully toggled {emphasis(status)}!")
 
 
-    def compact(self) -> None:
-        with self._ui.wait():
-            response = self._llm.compact()
+    async def compact(self) -> None:
+        with self._ui.wait(show_cancel_hint=True):
+            interrupted, response = await self._interrupt_coordinator.run(
+                self._llm.compact()
+            )
+
+        if interrupted:
+            self._ui.info("Compaction interrupted.")
+            return
 
         if response is not None:
             self._ui.stream_response(response)

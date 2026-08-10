@@ -1,4 +1,5 @@
 from typing import Any
+import asyncio
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis, dim
@@ -51,12 +52,22 @@ class ChatLLM:
         )
 
 
-    def _auto_compact(self, new_message: dict[str, Any] | None = None) -> None:
+    async def _complete_compaction(self) -> str | None:
+        compact_task = asyncio.create_task(self.compact())
+
+        try:
+            return await asyncio.shield(compact_task)
+        except asyncio.CancelledError:
+            await compact_task
+            raise
+
+
+    async def _auto_compact(self, new_message: dict[str, Any] | None = None) -> None:
         if not self._auto_compact_enabled:
             return
 
         payload = self._history + ([new_message] if new_message else [])
-        payload_len = self.get_token_count(payload)
+        payload_len = await self.get_token_count(payload)
 
         if payload_len is None:
             return
@@ -64,7 +75,7 @@ class ChatLLM:
         if payload_len > self._context_size:
             self._ui.warning("Token limit reached. Triggering auto-compact.")
 
-            if self.compact():
+            if await self._complete_compaction():
                 self._ui.success("Auto-compact successful. Context window refreshed!")
 
 
@@ -148,18 +159,18 @@ class ChatLLM:
         self._history.append(tool_response(tool_name, result))
 
 
-    def query_chat(self, user_input: str, chunks: str | None) -> str | None:
+    async def query_chat(self, user_input: str, chunks: str | None) -> str | None:
         new_message = user_message(self._construct_query(chunks, user_input))
         self._apply_rolling_window()
-        self._auto_compact(new_message)
+        await self._auto_compact(new_message)
         payload = self._history + [new_message]
-        payload_len = self.get_token_count(payload)
+        payload_len = await self.get_token_count(payload)
 
         if not self._within_token_limit(payload_len):
             return None
 
         try:
-            response = self._llm_adapter.generate_text(
+            response = await self._llm_adapter.generate_text(
                 model=self._chat_model,
                 contents=payload,
                 system_instruction=AXON_SYSTEM_PROMPT,
@@ -174,16 +185,16 @@ class ChatLLM:
         return response
 
 
-    def query_agent(self, tools: list[dict[str, Any]]) -> dict[str, Any] | None:
+    async def query_agent(self, tools: list[dict[str, Any]]) -> dict[str, Any] | None:
         self._apply_rolling_window()
-        self._auto_compact()
-        payload_len = self.get_token_count(self._history)
+        await self._auto_compact()
+        payload_len = await self.get_token_count(self._history)
 
         if not self._within_token_limit(payload_len):
             return None
 
         try:
-            response = self._llm_adapter.generate_with_tools(
+            response = await self._llm_adapter.generate_with_tools(
                 model=self._chat_model,
                 contents=self._history,
                 system_instruction=AXON_SYSTEM_PROMPT,
@@ -197,7 +208,7 @@ class ChatLLM:
         return response
 
 
-    def compact(self) -> str | None:
+    async def compact(self) -> str | None:
         if not self._history:
             self._ui.warning("Chat history is empty. Nothing to compact.")
             return None
@@ -210,7 +221,7 @@ class ChatLLM:
         )
 
         try:
-            response = self._llm_adapter.generate_text(
+            response = await self._llm_adapter.generate_text(
                 model=self._utility_model,
                 contents=text_message(compact_content),
                 system_instruction=COMPACT_SYSTEM_PROMPT,
@@ -224,12 +235,12 @@ class ChatLLM:
         return response
 
 
-    def get_token_count(self, history: list[dict[str, Any]] | None = None) -> int | None:
+    async def get_token_count(self, history: list[dict[str, Any]] | None = None) -> int | None:
         if history is None:
             history = self._history
 
         try:
-            token_count = self._llm_adapter.count_tokens(
+            token_count = await self._llm_adapter.count_tokens(
                 model=self._chat_model,
                 contents=history,
                 system_instruction=AXON_SYSTEM_PROMPT,
@@ -241,7 +252,7 @@ class ChatLLM:
         return token_count
 
 
-    def rewrite_query(self, query: str) -> str:
+    async def rewrite_query(self, query: str) -> str:
         recent_turns = self._history[-REWRITE_HISTORY_LIMIT:]
         transcript = format_history_transcript(recent_turns)
         user_contents = (
@@ -250,7 +261,7 @@ class ChatLLM:
         )
 
         try:
-            rewritten_query = self._llm_adapter.generate_text(
+            rewritten_query = await self._llm_adapter.generate_text(
                 model=self._utility_model,
                 contents=text_message(user_contents),
                 system_instruction=REWRITE_SYSTEM_PROMPT,

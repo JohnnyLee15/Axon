@@ -1,4 +1,5 @@
 from typing import Any, Callable
+import inspect
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
@@ -64,7 +65,7 @@ class CommandProcessor:
         return len(args) == expected_argc
 
 
-    def process(self, cmd: str) -> bool:
+    async def process(self, cmd: str) -> bool:
         cmd_data, args = self._resolve_command(cmd)
 
         if cmd_data is None:
@@ -82,4 +83,8 @@ class CommandProcessor:
 
         handler_name = cmd_data[COMMAND_KEYS.HANDLER]
         result = self._handlers[handler_name](*args)
+
+        if inspect.isawaitable(result):
+            result = await result
+
         return result == CommandResult.EXIT

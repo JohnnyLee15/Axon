@@ -143,7 +143,7 @@ class GeminiAdapter(LLMAdapter):
         self._client.models.list(config={"page_size": 1})
 
 
-    def count_tokens(
+    async def count_tokens(
         self,
         *,
         model: str,
@@ -156,8 +156,8 @@ class GeminiAdapter(LLMAdapter):
                 self._user_message(f"SYSTEM_INSTRUCTION:\n{system_instruction}")
             ] + contents
 
-        response = self._execute_with_retries(
-            api_func=self._client.models.count_tokens,
+        response = await self._execute_with_retries_async(
+            api_func=self._client.aio.models.count_tokens,
             model=model,
             contents=contents,
         )
@@ -165,7 +165,7 @@ class GeminiAdapter(LLMAdapter):
         return response.total_tokens
 
 
-    def generate_text(
+    async def generate_text(
         self,
         *,
         model: str,
@@ -173,8 +173,8 @@ class GeminiAdapter(LLMAdapter):
         system_instruction: str | None = None,
         temperature: float = 0.0,
     ) -> str:
-        response = self._execute_with_retries(
-            api_func=self._client.models.generate_content,
+        response = await self._execute_with_retries_async(
+            api_func=self._client.aio.models.generate_content,
             model=model,
             contents=self._format_history(contents),
             config=self._generate_config(
@@ -214,7 +214,7 @@ class GeminiAdapter(LLMAdapter):
         return json.loads(text)
 
 
-    def generate_with_tools(
+    async def generate_with_tools(
         self,
         *,
         model: str,
@@ -223,8 +223,8 @@ class GeminiAdapter(LLMAdapter):
         tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
     ) -> dict[str, Any]:
-        response = self._execute_with_retries(
-            api_func=self._client.models.generate_content,
+        response = await self._execute_with_retries_async(
+            api_func=self._client.aio.models.generate_content,
             model=model,
             contents=self._format_history(contents),
             config=self._generate_config(

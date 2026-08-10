@@ -4,7 +4,7 @@ from typing import Any, Callable
 from axon.ui.axon_ui import AxonUI
 
 from .contracts import LLM_CONTRACT
-from .retry import execute_with_retries
+from .retry import execute_with_retries, execute_with_retries_async
 from .errors import InvalidCredentialsError
 
 
@@ -57,7 +57,7 @@ class LLMAdapter(ABC):
 
 
     @abstractmethod
-    def count_tokens(
+    async def count_tokens(
         self,
         *,
         model: str,
@@ -68,7 +68,7 @@ class LLMAdapter(ABC):
 
 
     @abstractmethod
-    def generate_text(
+    async def generate_text(
         self,
         *,
         model: str,
@@ -93,7 +93,7 @@ class LLMAdapter(ABC):
 
 
     @abstractmethod
-    def generate_with_tools(
+    async def generate_with_tools(
         self,
         *,
         model: str,
@@ -115,11 +115,26 @@ class LLMAdapter(ABC):
         raise NotImplementedError
 
 
+    async def _execute_with_retries_async(
+        self,
+        api_func: Callable,
+        *args,
+        **kwargs,
+    ) -> Any:
+        return await execute_with_retries_async(
+            api_func=api_func,
+            is_retryable_error=self._is_retryable_error,
+            ui=self._ui,
+            *args,
+            **kwargs,
+        )
+
+
     def _execute_with_retries(
         self,
         api_func: Callable,
         *args,
-        **kwargs
+        **kwargs,
     ) -> Any:
         return execute_with_retries(
             api_func=api_func,
