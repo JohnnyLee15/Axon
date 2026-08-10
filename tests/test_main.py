@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from axon import __main__ as entrypoint
 
@@ -38,6 +38,7 @@ class MainEntrypointTests(unittest.TestCase):
             session_manager as manager_class,
             patch.object(entrypoint, "setup_gemini", return_value=adapter),
         ):
+            manager_class.return_value.run = AsyncMock()
             entrypoint.main()
 
         manager_class.assert_called_once_with(
@@ -45,7 +46,7 @@ class MainEntrypointTests(unittest.TestCase):
             llm_adapter=adapter,
             settings=self._settings,
         )
-        manager_class.return_value.run.assert_called_once_with()
+        manager_class.return_value.run.assert_awaited_once_with()
 
     def test_exits_with_failure_when_setup_cannot_validate_credentials(self) -> None:
         initialize, credential_store, axon_ui, session_manager = (
@@ -102,7 +103,9 @@ class MainEntrypointTests(unittest.TestCase):
             patch.object(entrypoint, "setup_gemini", return_value=adapter),
             self.assertRaises(SystemExit) as raised,
         ):
-            manager_class.return_value.run.side_effect = KeyboardInterrupt
+            manager_class.return_value.run = AsyncMock(
+                side_effect=KeyboardInterrupt,
+            )
             entrypoint.main()
 
         self.assertEqual(raised.exception.code, 130)
@@ -121,7 +124,7 @@ class MainEntrypointTests(unittest.TestCase):
             session_manager as manager_class,
             patch.object(entrypoint, "setup_gemini", return_value=adapter),
         ):
-            manager_class.return_value.run.side_effect = EOFError
+            manager_class.return_value.run = AsyncMock(side_effect=EOFError)
             entrypoint.main()
 
         self._ui.display_goodbye.assert_called_once_with()

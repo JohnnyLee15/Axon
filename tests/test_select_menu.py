@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
@@ -7,16 +7,16 @@ from prompt_toolkit.keys import Keys
 from axon.ui.select_menu import SelectMenu
 
 
-class SelectMenuTests(unittest.TestCase):
+class SelectMenuTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self._menu = SelectMenu.__new__(SelectMenu)
         self._menu._app = Mock()
-        self._menu._app.run.return_value = "Second"
+        self._menu._app.run_async = AsyncMock(return_value="Second")
         self._menu._highlighted_idx = 0
         self._menu._items = []
 
-    def test_starts_on_selected_item(self) -> None:
-        result = self._menu.select_item(
+    async def test_starts_on_selected_item(self) -> None:
+        result = await self._menu.select_item(
             items=["First", "Second", "Third"],
             selected_item="Second",
         )
@@ -24,10 +24,10 @@ class SelectMenuTests(unittest.TestCase):
         self.assertEqual(result, "Second")
         self.assertEqual(self._menu._highlighted_idx, 1)
 
-    def test_starts_on_first_item_when_selection_is_unavailable(self) -> None:
+    async def test_starts_on_first_item_when_selection_is_unavailable(self) -> None:
         self._menu._highlighted_idx = 2
 
-        self._menu.select_item(
+        await self._menu.select_item(
             items=["First", "Second", "Third"],
             selected_item="Missing",
         )
