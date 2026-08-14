@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from axon.db.chat_repository import ChatRepository
+from axon.db.contracts import CHAT_FIELDS
 from axon.db.schema_manager import CHAT_TABLE, SchemaManager
 from axon.db.sqlite_database import SQLiteDatabase
 from axon.llm.history import user_message
@@ -36,9 +37,12 @@ class ChatRepositoryTests(unittest.TestCase):
 
         self.assertEqual(loaded_history, history)
         self.assertEqual(len(summaries), 1)
-        self.assertEqual(summaries[0].name, "Research")
-        self.assertEqual(summaries[0].created_at, created_at)
-        self.assertEqual(summaries[0].last_accessed_at, accessed_at)
+        self.assertEqual(summaries[0][CHAT_FIELDS.NAME], "Research")
+        self.assertEqual(summaries[0][CHAT_FIELDS.CREATED_AT], created_at)
+        self.assertEqual(
+            summaries[0][CHAT_FIELDS.LAST_ACCESSED_AT],
+            accessed_at,
+        )
 
     def test_overwrite_preserves_creation_and_updates_access_time(self) -> None:
         original_time = "2026-08-10T12:00:00+00:00"
@@ -63,8 +67,11 @@ class ChatRepositoryTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertIn("New", content)
-        self.assertEqual(summary.created_at, original_time)
-        self.assertEqual(summary.last_accessed_at, overwrite_time)
+        self.assertEqual(summary[CHAT_FIELDS.CREATED_AT], original_time)
+        self.assertEqual(
+            summary[CHAT_FIELDS.LAST_ACCESSED_AT],
+            overwrite_time,
+        )
 
 
 if __name__ == "__main__":

@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .contracts import CHAT_FIELDS
-from .models import ChatSummary
 from .sqlite_database import SQLiteDatabase
 from .schema_manager import CHAT_TABLE
 
@@ -89,7 +88,7 @@ class ChatRepository:
         return None
 
 
-    def get_chat_summaries(self) -> list[ChatSummary]:
+    def get_chat_summaries(self) -> list[dict[str, str]]:
         sql = f"""
             SELECT
                 {CHAT_FIELDS.NAME},
@@ -102,4 +101,11 @@ class ChatRepository:
         with self._database.connect() as connection:
             rows = connection.execute(sql).fetchall()
 
-        return [ChatSummary(*row) for row in rows]
+        return [
+            {
+                CHAT_FIELDS.NAME: row[0],
+                CHAT_FIELDS.CREATED_AT: row[1],
+                CHAT_FIELDS.LAST_ACCESSED_AT: row[2],
+            }
+            for row in rows
+        ]

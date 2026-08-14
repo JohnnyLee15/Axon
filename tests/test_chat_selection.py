@@ -4,11 +4,23 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from rich.console import Console
 
-from axon.db.models import ChatSummary
+from axon.db.contracts import CHAT_FIELDS
 from axon.llm.history import user_message
 from axon.session.chat_handlers import ChatHandlers
 from axon.ui.axon_ui import AxonUI
 from axon.ui.views import Views
+
+
+def _chat_summary(
+    name: str,
+    created_at: str,
+    last_accessed_at: str,
+) -> dict[str, str]:
+    return {
+        CHAT_FIELDS.NAME: name,
+        CHAT_FIELDS.CREATED_AT: created_at,
+        CHAT_FIELDS.LAST_ACCESSED_AT: last_accessed_at,
+    }
 
 
 class ChatSelectionUITests(unittest.IsolatedAsyncioTestCase):
@@ -17,8 +29,8 @@ class ChatSelectionUITests(unittest.IsolatedAsyncioTestCase):
         ui._select_menu = Mock()
         ui._select_menu.select_item = AsyncMock()
         chats = [
-            ChatSummary("A", "created-a", "accessed-a"),
-            ChatSummary("Long Name", "created-b", "accessed-b"),
+            _chat_summary("A", "created-a", "accessed-a"),
+            _chat_summary("Long Name", "created-b", "accessed-b"),
         ]
 
         with patch(
@@ -49,7 +61,7 @@ class ChatSelectionHandlerTests(unittest.IsolatedAsyncioTestCase):
         self._handlers._ui.select_chat = AsyncMock()
 
     async def test_load_without_name_uses_selected_chat(self) -> None:
-        chats = [ChatSummary("Research", "created", "accessed")]
+        chats = [_chat_summary("Research", "created", "accessed")]
         history = [user_message("Hello")]
         self._handlers._chat_repository.get_chat_summaries.return_value = chats
         self._handlers._ui.select_chat.return_value = "Research"
@@ -75,7 +87,7 @@ class ChatSelectionHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_load_cancellation_preserves_current_history(self) -> None:
-        chats = [ChatSummary("Research", "created", "accessed")]
+        chats = [_chat_summary("Research", "created", "accessed")]
         self._handlers._chat_repository.get_chat_summaries.return_value = chats
         self._handlers._ui.select_chat.return_value = None
 
@@ -95,7 +107,7 @@ class ChatSelectionHandlerTests(unittest.IsolatedAsyncioTestCase):
         self._handlers._ui.select_chat.assert_not_awaited()
 
     async def test_delete_without_name_deletes_selected_chat(self) -> None:
-        chats = [ChatSummary("Research", "created", "accessed")]
+        chats = [_chat_summary("Research", "created", "accessed")]
         self._handlers._chat_repository.get_chat_summaries.return_value = chats
         self._handlers._ui.select_chat.return_value = "Research"
         self._handlers._chat_repository.delete_chat.return_value = True
@@ -108,7 +120,7 @@ class ChatSelectionHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_list_displays_chat_summaries(self) -> None:
-        chats = [ChatSummary("Research", "created", "accessed")]
+        chats = [_chat_summary("Research", "created", "accessed")]
         self._handlers._chat_repository.get_chat_summaries.return_value = chats
 
         self._handlers.list_chats()
@@ -126,7 +138,7 @@ class ChatListViewTests(unittest.TestCase):
         )
         views = Views(console)
         chats = [
-            ChatSummary(
+            _chat_summary(
                 "Research",
                 "2026-08-10T12:00:00+00:00",
                 "2026-08-11T15:30:00+00:00",

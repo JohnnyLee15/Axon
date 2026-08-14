@@ -1,7 +1,6 @@
 import sqlite3
 
 from axon.db.chat_repository import ChatRepository
-from axon.db.models import ChatSummary
 from axon.llm.chat_llm import ChatLLM
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis
@@ -59,7 +58,7 @@ class ChatHandlers:
         self._ui.success(f"Chat saved as \"{emphasis(name)}\"!")
 
 
-    def _get_chat_summaries(self) -> list[ChatSummary] | None:
+    def _get_chat_summaries(self) -> list[dict[str, str]] | None:
         try:
             return self._chat_repository.get_chat_summaries()
         except sqlite3.Error as error:

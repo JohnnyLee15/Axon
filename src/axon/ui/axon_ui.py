@@ -3,7 +3,7 @@ from typing import Any
 from rich.console import Console
 from rich.live import Live
 
-from axon.db.models import ChatSummary
+from axon.db.contracts import CHAT_FIELDS
 from axon.ui.select_menu import SelectMenu
 
 from .prompt import Prompt
@@ -33,19 +33,19 @@ class AxonUI:
         self._views.display_help(commands)
 
 
-    def display_chats(self, chats: list[ChatSummary]) -> None:
+    def display_chats(self, chats: list[dict[str, str]]) -> None:
         self._views.display_chats(chats)
 
 
-    async def select_chat(self, chats: list[ChatSummary]) -> str | None:
+    async def select_chat(self, chats: list[dict[str, str]]) -> str | None:
         if not chats:
             return None
 
         rows = [
             (
-                chat.name,
-                format_timestamp(chat.created_at),
-                format_timestamp(chat.last_accessed_at),
+                chat[CHAT_FIELDS.NAME],
+                format_timestamp(chat[CHAT_FIELDS.CREATED_AT]),
+                format_timestamp(chat[CHAT_FIELDS.LAST_ACCESSED_AT]),
             )
             for chat in chats
         ]

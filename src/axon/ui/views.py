@@ -9,7 +9,7 @@ from rich.table import Table
 from rich import box
 
 from axon.commands.contracts import COMMAND_KEYS
-from axon.db.models import ChatSummary
+from axon.db.contracts import CHAT_FIELDS
 from axon.llm.contracts import LLM_CONTRACT
 
 from .theme import STYLES, THEME_COLOUR, VIEW_EMOJIS
@@ -108,7 +108,7 @@ class Views:
         self._console.print(table)
 
 
-    def display_chats(self, chats: list[ChatSummary]) -> None:
+    def display_chats(self, chats: list[dict[str, str]]) -> None:
         if not chats:
             self._console.print(f"\n{VIEW_EMOJIS.EMPTY} {strong('No saved chats found in the database.')}")
             return
@@ -125,9 +125,9 @@ class Views:
 
         for chat in chats:
             table.add_row(
-                chat.name,
-                format_timestamp(chat.created_at),
-                format_timestamp(chat.last_accessed_at),
+                chat[CHAT_FIELDS.NAME],
+                format_timestamp(chat[CHAT_FIELDS.CREATED_AT]),
+                format_timestamp(chat[CHAT_FIELDS.LAST_ACCESSED_AT]),
             )
 
         self._console.print()
