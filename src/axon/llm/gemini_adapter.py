@@ -1,6 +1,7 @@
-from typing import Any
 import base64
 import json
+from collections.abc import AsyncIterator
+from typing import Any
 
 from google import genai
 from google.genai import types
@@ -223,6 +224,29 @@ class GeminiAdapter(LLMAdapter):
         )
 
         return (response.text or "").strip()
+
+    async def generate_text_stream(
+        self,
+        *,
+        model: str,
+        contents: list[dict[str, Any]],
+        system_instruction: str | None = None,
+        temperature: float = 0.0,
+    ) -> AsyncIterator[str]:
+        response_stream = await self._execute_with_retries_async(
+            api_func=self._client.aio.models.generate_content_stream,
+            model=model,
+            contents=self._format_history(contents),
+            config=self._generate_config(
+                system_instruction=system_instruction,
+                temperature=temperature,
+            ),
+        )
+
+        async for response_chunk in response_stream:
+            text = response_chunk.text
+            if text:
+                yield text
 
 
     def generate_json(

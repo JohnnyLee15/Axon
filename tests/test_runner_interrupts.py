@@ -1,6 +1,6 @@
 import unittest
 from contextlib import nullcontext
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 
 from axon.agent.tool_contracts import TOOL_RESULTS
 from axon.session.agent_runner import AgentRunner
@@ -47,9 +47,12 @@ class QueryRunnerInterruptTests(unittest.IsolatedAsyncioTestCase):
 
         await self._runner.process_query("Keep this message")
 
-        self._llm.add_user_history.assert_called_once_with("Keep this message")
+        self._llm.add_user_history.assert_not_called()
         self._ui.display_interrupted.assert_called_once_with()
-        self._ui.stream_response.assert_not_called()
+        self._ui.stream_response.assert_called_once_with(
+            response_stream=self._llm.query_chat.return_value,
+            started_at=ANY,
+        )
 
 
 class AgentRunnerInterruptTests(unittest.IsolatedAsyncioTestCase):

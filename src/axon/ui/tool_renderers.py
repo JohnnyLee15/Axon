@@ -32,7 +32,8 @@ class ToolRenderers:
             TOOL_NAMES.EXECUTE_SHELL_CMD: self._render_result_shell,
             TOOL_NAMES.CREATE_FILE: self._render_result_create_file,
             TOOL_NAMES.READ_FILE: self._render_result_read_file,
-            TOOL_NAMES.INSERT_TO_FILE: self._render_result_insert_to_file
+            TOOL_NAMES.INSERT_TO_FILE: self._render_result_insert_to_file,
+            TOOL_NAMES.SEARCH_WEB: self._render_result_web_search,
         }
 
         self._arg_renderers = {
@@ -41,7 +42,8 @@ class ToolRenderers:
             TOOL_NAMES.EXECUTE_SHELL_CMD: self._render_args_shell,
             TOOL_NAMES.CREATE_FILE: self._render_args_create_file,
             TOOL_NAMES.READ_FILE: self._render_args_read_file,
-            TOOL_NAMES.INSERT_TO_FILE: self._render_args_insert_to_file
+            TOOL_NAMES.INSERT_TO_FILE: self._render_args_insert_to_file,
+            TOOL_NAMES.SEARCH_WEB: self._render_args_web_search,
         }
 
 
@@ -136,6 +138,26 @@ class ToolRenderers:
             self._console.print(Panel(output, title=panel_title(MESSAGE_EMOJIS.WARNING, "Edit Status")))
 
 
+    def _render_result_web_search(
+        self,
+        results: dict[str, Any],
+    ) -> None:
+        sources = results.get(TOOL_RESULTS.SOURCES, [])
+
+        if sources:
+            summary = (
+                f"{AXON_TOOL_EMOJIS.SEARCH} Successfully retrieved "
+                f"{emphasis(len(sources))} web source(s)."
+            )
+        else:
+            summary = (
+                f"{AXON_TOOL_EMOJIS.SEARCH} "
+                "Web search completed without cited sources."
+            )
+
+        self._console.print(Panel(summary, title=panel_title(AXON_TOOL_EMOJIS.SEARCH, "Web Search Results")))
+
+
     def display_tool_output(self, tool_name: str, results: dict[str, Any]) -> None:
         renderer = self._tool_renderers[tool_name]
         self._console.print()
@@ -202,6 +224,14 @@ class ToolRenderers:
                 f"Inserting into: {emphasis(display_str)} after line {emphasis(insert_after_line)}",
             ),
         ))
+
+
+    def _render_args_web_search(self, args: dict) -> None:
+        query = args.get(TOOL_ARGS.QUERY, "")
+        self._console.print(
+            f"{AXON_TOOL_EMOJIS.SEARCH} "
+            f"Axon is searching the web for: \"{emphasis(query)}\""
+        )
 
 
     def display_tool_args(self, tool_name: str, args: dict) -> None:

@@ -12,6 +12,7 @@ class SessionSettingsTests(unittest.TestCase):
     def _construct_manager(self, settings: Mock) -> tuple[Mock, Mock, Mock]:
         ui = Mock()
         llm_adapter = Mock()
+        web_search_backend = Mock()
 
         with (
             patch.object(manager_module, "ChatLLM") as chat_llm,
@@ -23,6 +24,7 @@ class SessionSettingsTests(unittest.TestCase):
             SessionManager(
                 ui=ui,
                 llm_adapter=llm_adapter,
+                web_search_backend=web_search_backend,
                 settings=settings,
             )
 

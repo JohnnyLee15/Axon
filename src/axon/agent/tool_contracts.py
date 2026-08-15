@@ -1,5 +1,6 @@
 class ToolNames:
     SEARCH_LIBRARY = "search_library"
+    SEARCH_WEB = "search_web"
     REPLACE_IN_FILE = "replace_in_file"
     EXECUTE_SHELL_CMD = "execute_shell_cmd"
     CREATE_FILE = "create_file"
@@ -32,4 +33,5 @@ class ToolResults:
     DOC_COUNT = "doc_count"
     RAW_CHUNKS = "raw_chunks"
     TRUNCATED = "truncated"
+    SOURCES = "sources"
 TOOL_RESULTS = ToolResults()

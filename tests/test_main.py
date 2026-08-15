@@ -17,16 +17,23 @@ class MainEntrypointTests(unittest.TestCase):
         self._settings_store_patcher.start()
         self.addCleanup(self._settings_store_patcher.stop)
 
+
     def _dependency_patches(self):
         return (
             patch.object(entrypoint, "initialize_axon_home"),
-            patch.object(entrypoint, "CredentialStore", return_value=self._credentials),
+            patch.object(
+                entrypoint,
+                "CredentialStore",
+                return_value=self._credentials,
+            ),
             patch.object(entrypoint, "AxonUI", return_value=self._ui),
             patch.object(entrypoint, "SessionManager"),
         )
 
+
     def test_starts_session_after_successful_setup(self) -> None:
         adapter = Mock()
+        web_search_backend = Mock()
         initialize, credential_store, axon_ui, session_manager = (
             self._dependency_patches()
         )
@@ -36,7 +43,21 @@ class MainEntrypointTests(unittest.TestCase):
             credential_store,
             axon_ui,
             session_manager as manager_class,
-            patch.object(entrypoint, "setup_gemini", return_value=adapter),
+            patch.object(
+                entrypoint,
+                "setup_provider_api_key",
+                return_value="api-key",
+            ),
+            patch.object(
+                entrypoint,
+                "create_llm_adapter",
+                return_value=adapter,
+            ),
+            patch.object(
+                entrypoint,
+                "create_web_search_backend",
+                return_value=web_search_backend,
+            ),
         ):
             manager_class.return_value.run = AsyncMock()
             entrypoint.main()
@@ -44,9 +65,11 @@ class MainEntrypointTests(unittest.TestCase):
         manager_class.assert_called_once_with(
             ui=self._ui,
             llm_adapter=adapter,
+            web_search_backend=web_search_backend,
             settings=self._settings,
         )
         manager_class.return_value.run.assert_awaited_once_with()
+
 
     def test_exits_with_failure_when_setup_cannot_validate_credentials(self) -> None:
         initialize, credential_store, axon_ui, session_manager = (
@@ -58,12 +81,17 @@ class MainEntrypointTests(unittest.TestCase):
             credential_store,
             axon_ui,
             session_manager,
-            patch.object(entrypoint, "setup_gemini", return_value=None),
+            patch.object(
+                entrypoint,
+                "setup_provider_api_key",
+                return_value=None,
+            ),
             self.assertRaises(SystemExit) as raised,
         ):
             entrypoint.main()
 
         self.assertEqual(raised.exception.code, 1)
+
 
     def test_exits_as_interrupted_when_user_cancels_setup(self) -> None:
         initialize, credential_store, axon_ui, session_manager = (
@@ -77,7 +105,7 @@ class MainEntrypointTests(unittest.TestCase):
             session_manager,
             patch.object(
                 entrypoint,
-                "setup_gemini",
+                "setup_provider_api_key",
                 side_effect=KeyboardInterrupt,
             ),
             self.assertRaises(SystemExit) as raised,
@@ -89,8 +117,10 @@ class MainEntrypointTests(unittest.TestCase):
             "Gemini setup canceled. Axon was not started."
         )
 
-    def test_exits_as_interrupted_when_session_receives_keyboard_interrupt(self) -> None:
-        adapter = Mock()
+
+    def test_exits_as_interrupted_when_session_receives_keyboard_interrupt(
+        self,
+    ) -> None:
         initialize, credential_store, axon_ui, session_manager = (
             self._dependency_patches()
         )
@@ -100,7 +130,13 @@ class MainEntrypointTests(unittest.TestCase):
             credential_store,
             axon_ui,
             session_manager as manager_class,
-            patch.object(entrypoint, "setup_gemini", return_value=adapter),
+            patch.object(
+                entrypoint,
+                "setup_provider_api_key",
+                return_value="api-key",
+            ),
+            patch.object(entrypoint, "create_llm_adapter"),
+            patch.object(entrypoint, "create_web_search_backend"),
             self.assertRaises(SystemExit) as raised,
         ):
             manager_class.return_value.run = AsyncMock(
@@ -111,8 +147,8 @@ class MainEntrypointTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 130)
         self._ui.display_goodbye.assert_called_once_with()
 
+
     def test_exits_cleanly_when_session_reaches_end_of_input(self) -> None:
-        adapter = Mock()
         initialize, credential_store, axon_ui, session_manager = (
             self._dependency_patches()
         )
@@ -122,7 +158,13 @@ class MainEntrypointTests(unittest.TestCase):
             credential_store,
             axon_ui,
             session_manager as manager_class,
-            patch.object(entrypoint, "setup_gemini", return_value=adapter),
+            patch.object(
+                entrypoint,
+                "setup_provider_api_key",
+                return_value="api-key",
+            ),
+            patch.object(entrypoint, "create_llm_adapter"),
+            patch.object(entrypoint, "create_web_search_backend"),
         ):
             manager_class.return_value.run = AsyncMock(side_effect=EOFError)
             entrypoint.main()

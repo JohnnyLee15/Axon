@@ -1,5 +1,6 @@
-from typing import Any
 import asyncio
+from collections.abc import AsyncIterator
+from typing import Any
 
 from axon.ui.axon_ui import AxonUI
 from axon.ui.formatters import emphasis, dim
@@ -177,30 +178,49 @@ class ChatLLM:
         ))
 
 
-    async def query_chat(self, user_input: str, chunks: str | None) -> str | None:
-        new_message = user_message(self._construct_query(chunks, user_input))
-        self._apply_rolling_window()
-        await self._auto_compact(new_message)
-        payload = self._history + [new_message]
-        payload_len = await self.get_token_count(payload)
-
-        if not self._within_token_limit(payload_len):
-            return None
+    async def query_chat(
+        self,
+        user_input: str,
+        chunks: str | None,
+    ) -> AsyncIterator[str]:
+        user_history_added = False
+        response_parts = []
 
         try:
-            response = await self._llm_adapter.generate_text(
+            new_message = user_message(self._construct_query(chunks, user_input))
+            self._apply_rolling_window()
+            await self._auto_compact(new_message)
+            payload = self._history + [new_message]
+            payload_len = await self.get_token_count(payload)
+
+            if not self._within_token_limit(payload_len):
+                return
+
+            self.add_user_history(user_input)
+            user_history_added = True
+
+            async for response_chunk in self._llm_adapter.generate_text_stream(
                 model=self._chat_model,
                 contents=payload,
                 system_instruction=AXON_SYSTEM_PROMPT,
                 temperature=CHAT_TEMPERATURE,
-            )
-        except Exception as e:
-            self._ui.error(f"Generation Error: {e}.")
-            return None
+            ):
+                response_parts.append(response_chunk)
+                yield response_chunk
 
-        self.add_user_history(user_input)
+        except asyncio.CancelledError:
+            if not user_history_added:
+                self.add_user_history(user_input)
+            raise
+
+        except Exception as e:
+            if not user_history_added:
+                self.add_user_history(user_input)
+            self._ui.error(f"Generation Error: {e}.")
+            return
+
+        response = "".join(response_parts)
         self.add_model_history(response)
-        return response
 
 
     async def query_agent(self, tools: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -232,11 +252,7 @@ class ChatLLM:
             return None
 
         transcript = format_history_transcript(self._history)
-        compact_content = (
-            "Compress the following conversation history into a self-contained "
-            f"memory summary that can replace the original chat.\n"
-            f"<chat_history>\n{transcript.strip()}\n</chat_history>"
-        )
+        compact_content = f"<chat_history>\n{transcript.strip()}\n</chat_history>"
 
         try:
             response = await self._llm_adapter.generate_text(

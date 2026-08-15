@@ -152,8 +152,27 @@ INSERT_TO_FILE_SCHEMA = {
     }
 }
 
+SEARCH_WEB_SCHEMA = {
+    "name": TOOL_NAMES.SEARCH_WEB,
+    "description": (
+        "Searches the public web for the supplied query and returns a concise, "
+        "source-grounded summary with source titles and URLs."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            TOOL_ARGS.QUERY: {
+                "type": "string",
+                "description": "A concise, standalone web search query.",
+            }
+        },
+        "required": [TOOL_ARGS.QUERY],
+    },
+}
+
 TOOL_SCHEMAS = [
     SEARCH_LIBRARY_SCHEMA,
+    SEARCH_WEB_SCHEMA,
     EXECUTE_SHELL_CMD_SCHEMA,
     CREATE_FILE_SCHEMA,
     REPLACE_IN_FILE_SCHEMA,

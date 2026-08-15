@@ -11,8 +11,9 @@ from rich import box
 from axon.commands.contracts import COMMAND_KEYS
 from axon.db.contracts import CHAT_FIELDS
 from axon.llm.contracts import LLM_CONTRACT
+from axon.web_search.contracts import WEB_SOURCE_FIELDS
 
-from .theme import STYLES, THEME_COLOUR, VIEW_EMOJIS
+from .theme import AXON_TOOL_EMOJIS, STYLES, THEME_COLOUR, VIEW_EMOJIS
 from .formatters import (
     strong,
     panel_title,
@@ -231,9 +232,26 @@ class Views:
             )
             self._console.print(f"\n  {emphasis(i)} {strong(title)}")
 
-            # TODO: Make tab constant
             if id_str:
                 self._console.print(f"    • {id_str}", highlight=False)
+
+
+    def display_web_sources(self, sources: list[dict[str, str]]) -> None:
+        self._console.print()
+        self._console.rule(style=STYLES.STRONG)
+        self._console.print(f"{VIEW_EMOJIS.REFERENCES} {strong('Web Sources')}")
+
+        for i, source in enumerate(sources, start=1):
+            title = source[WEB_SOURCE_FIELDS.TITLE]
+            url = source[WEB_SOURCE_FIELDS.URL]
+
+            source_line = Text()
+            source_line.append(f"\n  {i} ", style=STYLES.EMPHASIS)
+            source_line.append(
+                f"{title} ↗",
+                style=f"{STYLES.STRONG} link {url}",
+            )
+            self._console.print(source_line)
 
 
     def display_section(self, title: str) -> None:

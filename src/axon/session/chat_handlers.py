@@ -206,5 +206,5 @@ class ChatHandlers:
             return
 
         if response is not None:
-            self._ui.stream_response(response)
+            self._ui.display_response(response)
             self._ui.success("Successfully compacted chat history!")

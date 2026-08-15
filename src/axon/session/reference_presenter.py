@@ -3,6 +3,7 @@ import sqlite3
 from axon.db.paper_repository import PaperRepository
 from axon.db.contracts import CHUNK_FIELDS
 from axon.ui.axon_ui import AxonUI
+from axon.web_search.contracts import WEB_SOURCE_FIELDS
 
 
 class ReferencePresenter:
@@ -27,3 +28,19 @@ class ReferencePresenter:
             return
 
         self._ui.display_references(paper_properties)
+
+
+    def display_web_sources(self, sources: list[dict[str, str]]) -> None:
+        unique_sources = []
+        seen_urls = set()
+
+        for source in sources:
+            url = source[WEB_SOURCE_FIELDS.URL]
+            if url in seen_urls:
+                continue
+
+            seen_urls.add(url)
+            unique_sources.append(source)
+
+        if unique_sources:
+            self._ui.display_web_sources(unique_sources)

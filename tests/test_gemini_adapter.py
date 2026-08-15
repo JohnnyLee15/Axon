@@ -112,6 +112,28 @@ class GeminiAdapterGenerationTests(unittest.IsolatedAsyncioTestCase):
             self._adapter._client.aio.models.generate_content,
         )
 
+    async def test_generate_text_stream_yields_provider_chunks(self) -> None:
+        async def response_stream():
+            yield Mock(text="first ")
+            yield Mock(text="")
+            yield Mock(text="second")
+
+        self._adapter._execute_with_retries_async.return_value = response_stream()
+
+        chunks = [
+            chunk
+            async for chunk in self._adapter.generate_text_stream(
+                model="gemini-test",
+                contents=[],
+            )
+        ]
+
+        self.assertEqual(chunks, ["first ", "second"])
+        self.assertIs(
+            self._adapter._execute_with_retries_async.await_args.kwargs["api_func"],
+            self._adapter._client.aio.models.generate_content_stream,
+        )
+
     async def test_generate_with_tools_uses_async_client(self) -> None:
         response = Mock(function_calls=[], candidates=[])
         self._adapter._execute_with_retries_async.return_value = response

@@ -55,16 +55,19 @@ class QueryRunner:
 
         self._ui.display_tool_output(TOOL_NAMES.SEARCH_LIBRARY, results)
 
-        with self._ui.wait(
-            show_cancel_hint=True,
-            started_at=started_at,
-        ):
-            interrupted, response = await self._interrupt_coordinator.run(
-                self._llm.query_chat(user_input, results[TOOL_RESULTS.CONTENT])
+        response_stream = self._llm.query_chat(
+            user_input,
+            results[TOOL_RESULTS.CONTENT],
+        )
+        interrupted, response = await self._interrupt_coordinator.run(
+            self._ui.stream_response(
+                response_stream=response_stream,
+                started_at=started_at,
             )
+        )
 
         if interrupted:
-            self._handle_interruption(user_input)
+            self._ui.display_interrupted()
             return
 
         if not response:
@@ -72,5 +75,4 @@ class QueryRunner:
 
         total_seconds = int(time.monotonic() - started_at)
         self._ui.display_work_duration(total_seconds)
-        self._ui.stream_response(response)
         self._reference_presenter.display_references(results[TOOL_RESULTS.RAW_CHUNKS])

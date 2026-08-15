@@ -1,5 +1,6 @@
 from typing import Any
 import time
+import inspect
 
 from axon.llm.chat_llm import ChatLLM
 from axon.llm.contracts import LLM_CONTRACT
@@ -10,6 +11,7 @@ from axon.agent.tool_contracts import TOOL_NAMES, TOOL_RESULTS
 from axon.agent.tool_schemas import TOOL_SCHEMAS
 from axon.agent.shell_tools import execute_shell_cmd
 from axon.agent.library_search_tool import LibrarySearchTool
+from axon.agent.web_search_tool import WebSearchTool
 from axon.agent.file_tools import (
     create_file,
     insert_to_file,
@@ -26,12 +28,14 @@ class AgentRunner:
         self,
         llm: ChatLLM,
         library_search_tool: LibrarySearchTool,
+        web_search_tool: WebSearchTool,
         ui: AxonUI,
         reference_presenter: ReferencePresenter,
         interrupt_coordinator: InterruptCoordinator,
     ) -> None:
         self._llm = llm
         self._library_search_tool = library_search_tool
+        self._web_search_tool = web_search_tool
         self._ui = ui
         self._reference_presenter = reference_presenter
         self._interrupt_coordinator = interrupt_coordinator
@@ -43,6 +47,7 @@ class AgentRunner:
         self._trusted_tools = set()
         self._tool_functions = {
             TOOL_NAMES.SEARCH_LIBRARY: self._library_search_tool.search_library,
+            TOOL_NAMES.SEARCH_WEB: self._web_search_tool.search_web,
             TOOL_NAMES.EXECUTE_SHELL_CMD: execute_shell_cmd,
             TOOL_NAMES.CREATE_FILE: create_file,
             TOOL_NAMES.REPLACE_IN_FILE: replace_in_file,
@@ -152,7 +157,7 @@ class AgentRunner:
         )
 
 
-    def _execute_tool(
+    async def _execute_tool(
         self,
         tool_name: str,
         tool_args: dict[str, Any],
@@ -162,7 +167,12 @@ class AgentRunner:
         self._ui.progress(f"Agent executing: {emphasis(tool_name)}.")
 
         with self._ui.wait(started_at=started_at):
-            results = self._tool_functions[tool_name](**tool_args)
+            result = self._tool_functions[tool_name](**tool_args)
+
+            if inspect.isawaitable(result):
+                results = await result
+            else:
+                results = result
 
         self._ui.display_tool_output(tool_name, results)
 
@@ -181,11 +191,11 @@ class AgentRunner:
         return results
 
 
-    def _handle_tool_call(
+    async def _handle_tool_call(
         self,
         tool_call: dict[str, Any],
         started_at: float,
-    ) -> dict[int, dict[str, str | int]]:
+    ) -> dict[str, Any]:
         tool_name = tool_call[LLM_CONTRACT.NAME]
         tool_args = tool_call[LLM_CONTRACT.ARGS]
         provider_metadata = tool_call.get(LLM_CONTRACT.PROVIDER_METADATA)
@@ -208,29 +218,31 @@ class AgentRunner:
             if not proceed:
                 return {}
 
-        results = self._execute_tool(
+        results = await self._execute_tool(
             tool_name,
             tool_args,
             provider_metadata,
             started_at,
         )
-        return results.get(TOOL_RESULTS.RAW_CHUNKS) or {}
+        return results
 
 
     def _finish_response(
         self,
         response: dict[str, Any],
-        retrieved_chunks: dict[int, dict[str, str | int]]
+        retrieved_chunks: dict[int, dict[str, str | int]],
+        web_sources: list[dict[str, str]],
     ) -> None:
         response_text = response[LLM_CONTRACT.TEXT]
 
-        if not response_text:
+        if response_text:
+            self._llm.add_model_history(response_text)
+            self._ui.display_response(response_text)
+        else:
             self._ui.success("Agent task completed.")
-            return
 
-        self._llm.add_model_history(response_text)
-        self._ui.stream_response(response_text)
         self._reference_presenter.display_references(retrieved_chunks)
+        self._reference_presenter.display_web_sources(web_sources)
 
 
     async def process_query(self, user_input: str) -> None:
@@ -238,6 +250,7 @@ class AgentRunner:
 
         self._llm.add_user_history(user_input)
         retrieved_chunks = {}
+        web_sources = []
         agent_running = True
 
         while agent_running:
@@ -258,11 +271,13 @@ class AgentRunner:
 
             tool_calls = response[LLM_CONTRACT.TOOL_CALLS]
             if tool_calls:
-                raw_chunks = self._handle_tool_call(tool_calls[0], started_at)
+                results = await self._handle_tool_call(tool_calls[0], started_at)
+                raw_chunks = results.get(TOOL_RESULTS.RAW_CHUNKS) or {}
                 retrieved_chunks.update(raw_chunks)
+                web_sources.extend(results.get(TOOL_RESULTS.SOURCES) or [])
             else:
                 agent_running = False
 
         total_seconds = int(time.monotonic() - started_at)
         self._ui.display_work_duration(total_seconds)
-        self._finish_response(response, retrieved_chunks)
+        self._finish_response(response, retrieved_chunks, web_sources)

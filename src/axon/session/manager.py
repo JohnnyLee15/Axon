@@ -23,6 +23,9 @@ from axon.ingestion.torch_embedding_backend import TorchEmbeddingBackend
 from axon.retrieval.factory import create_reranker
 
 from axon.agent.library_search_tool import LibrarySearchTool
+from axon.agent.web_search_tool import WebSearchTool
+
+from axon.web_search.backend import WebSearchBackend
 
 from axon.llm.chat_llm import ChatLLM
 from axon.llm.llm_adapter import LLMAdapter
@@ -49,12 +52,14 @@ class SessionManager:
         self,
         ui: AxonUI,
         llm_adapter: LLMAdapter,
+        web_search_backend: WebSearchBackend,
         settings: SettingsStore,
     ):
         self._agent_mode_enabled = False
         self._settings = settings
         self._ui = ui
         self._llm_adapter = llm_adapter
+        self._web_search_backend = web_search_backend
 
         self._interrupt_coordinator = InterruptCoordinator(self._ui)
         self._llm = ChatLLM(
@@ -107,6 +112,10 @@ class SessionManager:
             reranker=self._reranker,
         )
 
+        self._web_search_tool = WebSearchTool(
+            backend=self._web_search_backend,
+        )
+
         self._reference_presenter = ReferencePresenter(
             paper_repository=self._paper_repository,
             ui=self._ui,
@@ -137,6 +146,7 @@ class SessionManager:
         self._agent_runner = AgentRunner(
             llm=self._llm,
             library_search_tool=self._library_search_tool,
+            web_search_tool=self._web_search_tool,
             ui=self._ui,
             reference_presenter=self._reference_presenter,
             interrupt_coordinator=self._interrupt_coordinator,

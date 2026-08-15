@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from typing import Any, Callable
 
 from axon.ui.axon_ui import AxonUI
@@ -78,6 +79,18 @@ class LLMAdapter(ABC):
         system_instruction: str | None = None,
         temperature: float = 0.0,
     ) -> str:
+        raise NotImplementedError
+
+
+    @abstractmethod
+    def generate_text_stream(
+        self,
+        *,
+        model: str,
+        contents: list[dict[str, Any]],
+        system_instruction: str | None = None,
+        temperature: float = 0.0,
+    ) -> AsyncIterator[str]:
         raise NotImplementedError
 
 

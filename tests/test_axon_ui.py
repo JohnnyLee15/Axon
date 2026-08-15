@@ -10,6 +10,7 @@ class AxonUITests(unittest.IsolatedAsyncioTestCase):
         self._ui._console = Mock()
         self._ui._prompt = Mock()
         self._ui._prompt.listen = AsyncMock()
+        self._ui._prompt.stream_response = AsyncMock()
         self._ui._select_menu = Mock()
         self._ui._select_menu.select_item = AsyncMock()
         self._ui._suppress_next_prompt_newline = False
@@ -56,6 +57,31 @@ class AxonUITests(unittest.IsolatedAsyncioTestCase):
         self._ui._prompt.wait.assert_called_once_with(
             show_cancel_hint=True,
             started_at=100.0,
+        )
+
+    async def test_stream_response_forwards_stream_and_start_time(self) -> None:
+        async def response_stream():
+            yield "response"
+
+        stream = response_stream()
+        self._ui._prompt.stream_response.return_value = "response"
+
+        response = await self._ui.stream_response(
+            response_stream=stream,
+            started_at=100.0,
+        )
+
+        self.assertEqual(response, "response")
+        self._ui._prompt.stream_response.assert_awaited_once_with(
+            response_stream=stream,
+            started_at=100.0,
+        )
+
+    def test_display_response_delegates_to_prompt(self) -> None:
+        self._ui.display_response("complete response")
+
+        self._ui._prompt.display_response.assert_called_once_with(
+            "complete response"
         )
 
     async def test_select_item_maps_string_option_to_display_and_back(self) -> None:

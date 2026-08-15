@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from rich.console import Console, Group, NewLine
@@ -7,7 +8,6 @@ from rich.markdown import Markdown
 from rich.spinner import Spinner
 
 import math
-import time
 
 from pylatexenc.latex2text import LatexNodes2Text
 
@@ -96,19 +96,30 @@ class Prompt:
         ).strip()
 
 
-    def wait(
+    def _create_wait_renderable(
         self,
-        show_cancel_hint: bool = False,
-        started_at: float | None = None,
-    ) -> Live:
+        show_cancel_hint: bool,
+        started_at: float | None,
+    ) -> Group:
         status = WaitStatus(
             show_cancel_hint=show_cancel_hint,
             started_at=started_at,
         )
 
-        renderable = Group(
+        return Group(
             NewLine(),
             Spinner("dots", text=status, style=STYLES.DIM),
+        )
+
+
+    def wait(
+        self,
+        show_cancel_hint: bool = False,
+        started_at: float | None = None,
+    ) -> Live:
+        renderable = self._create_wait_renderable(
+            show_cancel_hint=show_cancel_hint,
+            started_at=started_at,
         )
 
         return Live(
@@ -119,18 +130,42 @@ class Prompt:
         )
 
 
-    def stream_response(self, response: str) -> None:
-        response = self._latex_converter.latex_to_text(response)
-        display_text = "<br>**[Axon] >** "
+    async def stream_response(
+        self,
+        response_stream: AsyncIterator[str],
+        started_at: float,
+    ) -> str:
+        response = ""
+        initial_renderable = self._create_wait_renderable(
+            show_cancel_hint=True,
+            started_at=started_at,
+        )
 
         with Live(
+            initial_renderable,
             console=self._console,
-            refresh_per_second=30
+            refresh_per_second=REFRESH_RATE,
         ) as live:
-            for char in response:
-                display_text += char
-                live.update(Markdown(display_text))
-                time.sleep(0.001)
+            try:
+                async for response_chunk in response_stream:
+                    response += response_chunk
+                    display_response = self._latex_converter.latex_to_text(response)
+                    live.update(
+                        Markdown(f"<br>**[Axon] >** {display_response}"),
+                        refresh=True,
+                    )
+            finally:
+                if not response:
+                    live.update(Text(""), refresh=True)
+
+        return response
+
+
+    def display_response(self, response: str) -> None:
+        response = self._latex_converter.latex_to_text(response)
+        self._console.print(
+            Markdown(f"<br>**[Axon] >** {response}")
+        )
 
 
     def clear_screen(self) -> None:

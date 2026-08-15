@@ -7,8 +7,10 @@ from axon.llm.contracts import LLM_CONTRACT
 from axon.session.agent_runner import AgentRunner
 
 
-class ToolMetadataTests(unittest.TestCase):
-    def test_agent_records_provider_metadata_with_call_and_response(self) -> None:
+class ToolMetadataTests(unittest.IsolatedAsyncioTestCase):
+    async def test_agent_records_provider_metadata_with_call_and_response(
+        self,
+    ) -> None:
         metadata = {
             "gemini": {
                 "function_call_id": "call-123",
@@ -26,7 +28,7 @@ class ToolMetadataTests(unittest.TestCase):
         runner._ui = Mock()
         runner._ui.wait.return_value = nullcontext()
 
-        runner._handle_tool_call(
+        results = await runner._handle_tool_call(
             {
                 LLM_CONTRACT.NAME: tool_name,
                 LLM_CONTRACT.ARGS: tool_args,
@@ -45,6 +47,7 @@ class ToolMetadataTests(unittest.TestCase):
             "complete",
             metadata,
         )
+        self.assertEqual(results, {TOOL_RESULTS.CONTENT: "complete"})
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 from rich.console import Console
@@ -81,6 +82,10 @@ class AxonUI:
         self._views.display_references(papers)
 
 
+    def display_web_sources(self, sources: list[dict[str, str]]) -> None:
+        self._views.display_web_sources(sources)
+
+
     def display_section(self, title: str) -> None:
         self._views.display_section(title)
 
@@ -144,8 +149,19 @@ class AxonUI:
         )
 
 
-    def stream_response(self, response: str) -> None:
-        self._prompt.stream_response(response)
+    async def stream_response(
+        self,
+        response_stream: AsyncIterator[str],
+        started_at: float,
+    ) -> str:
+        return await self._prompt.stream_response(
+            response_stream=response_stream,
+            started_at=started_at,
+        )
+
+
+    def display_response(self, response: str) -> None:
+        self._prompt.display_response(response)
 
 
     def display_tool_output(self, tool_name: str, results: dict[str, Any]) -> None:

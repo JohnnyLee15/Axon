@@ -1,16 +1,18 @@
 import sys
 import asyncio
 
-from axon.commands.completion import build_command_options
-from axon.commands.registry import COMMANDS
-
+from .commands.completion import build_command_options
+from .commands.registry import COMMANDS
 from .session.manager import SessionManager
 from .config.paths import (
     ENV_PATH,
     SETTINGS_JSON_PATH,
     initialize_axon_home,
 )
-from .llm.gemini_setup import setup_gemini
+from .llm.factory import create_llm_adapter
+from .llm.provider_setup import setup_provider_api_key
+from .llm.providers import GEMINI_PROVIDER
+from .web_search.factory import create_web_search_backend
 from .ui.axon_ui import AxonUI
 from .config.credential_store import CredentialStore
 from .config.settings_store import SettingsStore
@@ -23,17 +25,32 @@ def main() -> None:
     ui = AxonUI(build_command_options(COMMANDS))
 
     try:
-        llm_adapter = setup_gemini(ui=ui, credentials=credentials)
+        api_key = setup_provider_api_key(
+            provider=GEMINI_PROVIDER,
+            ui=ui,
+            credentials=credentials,
+        )
     except (KeyboardInterrupt, EOFError):
         ui.info("Gemini setup canceled. Axon was not started.")
         sys.exit(130)
 
-    if llm_adapter is None:
+    if api_key is None:
         sys.exit(1)
+
+    llm_adapter = create_llm_adapter(
+        provider=GEMINI_PROVIDER,
+        ui=ui,
+        api_key=api_key,
+    )
+    web_search_backend = create_web_search_backend(
+        provider=GEMINI_PROVIDER,
+        api_key=api_key,
+    )
 
     manager = SessionManager(
         ui=ui,
         llm_adapter=llm_adapter,
+        web_search_backend=web_search_backend,
         settings=settings,
     )
 

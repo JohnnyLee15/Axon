@@ -22,7 +22,7 @@ class ManualCompactionInterruptTests(unittest.IsolatedAsyncioTestCase):
         await handlers.compact()
 
         handlers._ui.info.assert_called_once_with("Compaction interrupted.")
-        handlers._ui.stream_response.assert_not_called()
+        handlers._ui.display_response.assert_not_called()
         handlers._ui.success.assert_not_called()
 
 
