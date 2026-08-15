@@ -38,7 +38,7 @@ pipx ensurepath
 Open a new terminal, then install Axon:
 
 ```bash
-pipx install --python 3.12 --fetch-python=missing "git+https://github.com/JohnnyLee15/Axon.git"
+pipx install --python 3.12 --fetch-python=missing axon-ai-agent
 ```
 
 After installation, start Axon from any directory:
