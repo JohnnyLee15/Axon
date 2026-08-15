@@ -45,6 +45,18 @@ class WaitStatusTests(unittest.TestCase):
 
         self.assertEqual(rendered.plain, "Working (12s)")
 
+    def test_renders_custom_label(self) -> None:
+        with patch("axon.ui.wait_status.time.monotonic", return_value=112.9):
+            status = WaitStatus(
+                show_cancel_hint=False,
+                started_at=100.0,
+                label="Downloading model",
+            )
+
+            rendered = status.__rich__()
+
+        self.assertEqual(rendered.plain, "Downloading model (12s)")
+
 
 if __name__ == "__main__":
     unittest.main()

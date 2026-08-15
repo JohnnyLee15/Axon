@@ -14,6 +14,7 @@ from .messages import Messages
 from .contracts import OPTION_DESC_KEY, OPTION_KEY
 from .interrupt_listener import InterruptListener
 from .formatters import format_timestamp
+from .wait_status import DEFAULT_WAIT_LABEL
 
 
 class AxonUI:
@@ -142,10 +143,12 @@ class AxonUI:
         self,
         show_cancel_hint: bool = False,
         started_at: float | None = None,
+        label: str = DEFAULT_WAIT_LABEL,
     ) -> Live:
         return self._prompt.wait(
             show_cancel_hint=show_cancel_hint,
             started_at=started_at,
+            label=label,
         )
 
 

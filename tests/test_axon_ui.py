@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock
 
 from axon.ui.axon_ui import AxonUI
+from axon.ui.wait_status import DEFAULT_WAIT_LABEL
 
 
 class AxonUITests(unittest.IsolatedAsyncioTestCase):
@@ -57,6 +58,16 @@ class AxonUITests(unittest.IsolatedAsyncioTestCase):
         self._ui._prompt.wait.assert_called_once_with(
             show_cancel_hint=True,
             started_at=100.0,
+            label=DEFAULT_WAIT_LABEL,
+        )
+
+    def test_wait_forwards_custom_label_to_prompt(self) -> None:
+        self._ui.wait(label="Downloading model")
+
+        self._ui._prompt.wait.assert_called_once_with(
+            show_cancel_hint=False,
+            started_at=None,
+            label="Downloading model",
         )
 
     async def test_stream_response_forwards_stream_and_start_time(self) -> None:

@@ -72,11 +72,13 @@ class PdfParser:
         self,
         document_curator: DocumentCurator,
         metadata_extractor: MetadataExtractor,
+        artifacts_path: Path,
     ) -> None:
         self._document_curator = document_curator
         self._metadata_extractor = metadata_extractor
 
         pipeline_opts = PdfPipelineOptions(
+            artifacts_path=artifacts_path,
             do_ocr=False,
             accelerator_options=AcceleratorOptions(
                 num_threads=DOCLING_NUM_THREADS,
@@ -212,4 +214,3 @@ class PdfParser:
             item.label.name,
             self._document_curator.is_potentially_noise(markdown)
         )
-

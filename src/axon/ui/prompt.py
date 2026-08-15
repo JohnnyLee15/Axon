@@ -15,7 +15,7 @@ from axon.config.paths import PROMPT_HISTORY_PATH
 
 from .theme import ANSI_COLOURS, theme_colour, STYLES
 from .input_session import InputSession
-from .wait_status import WaitStatus
+from .wait_status import DEFAULT_WAIT_LABEL, WaitStatus
 
 
 CONTEXT_NOT_FULL_PERCENT = 65
@@ -100,10 +100,12 @@ class Prompt:
         self,
         show_cancel_hint: bool,
         started_at: float | None,
+        label: str,
     ) -> Group:
         status = WaitStatus(
             show_cancel_hint=show_cancel_hint,
             started_at=started_at,
+            label=label,
         )
 
         return Group(
@@ -116,10 +118,12 @@ class Prompt:
         self,
         show_cancel_hint: bool = False,
         started_at: float | None = None,
+        label: str = DEFAULT_WAIT_LABEL,
     ) -> Live:
         renderable = self._create_wait_renderable(
             show_cancel_hint=show_cancel_hint,
             started_at=started_at,
+            label=label,
         )
 
         return Live(
@@ -139,6 +143,7 @@ class Prompt:
         initial_renderable = self._create_wait_renderable(
             show_cancel_hint=True,
             started_at=started_at,
+            label=DEFAULT_WAIT_LABEL,
         )
 
         with Live(

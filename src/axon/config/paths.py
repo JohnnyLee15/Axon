@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-DEFAULT_AXON_HOME = Path.home() / "Axon"
+DEFAULT_AXON_HOME = Path.home() / ".axon"
 AXON_HOME = Path(os.getenv("AXON_HOME", str(DEFAULT_AXON_HOME))).expanduser().resolve()
 
 DATA_DIR = AXON_HOME / "data"

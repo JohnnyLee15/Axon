@@ -1,6 +1,7 @@
 import logging
 import os
 import warnings
+from pathlib import Path
 
 
 MODEL_LIBRARY_LOGGERS = (
@@ -53,7 +54,6 @@ from .context_buffer_tracker import ContextBufferTracker
 from .models import Chunk
 
 
-EMBEDDING_MODEL = "jinaai/jina-embeddings-v3-hf"
 MAX_QUERY_TOKENS = 8192
 MAX_CONTEXT_TOKENS = 2048
 PASSAGE_EMBEDDING_ADAPTER = "retrieval_passage"
@@ -65,15 +65,19 @@ EMBEDDING_ADAPTERS = (
 
 
 class TorchEmbeddingBackend(EmbeddingBackend):
-    def __init__(self) -> None:
+    def __init__(self, model_path: Path) -> None:
         self._device = get_torch_device()
+        self._model_path = model_path
 
-        self._model = AutoModel.from_pretrained(EMBEDDING_MODEL, dtype=get_dtype())
+        self._model = AutoModel.from_pretrained(
+            self._model_path,
+            dtype=get_dtype(),
+        )
         self._load_adapters()
         self._model.to(self._device)
         self._model.eval()
 
-        self._tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._model_path)
 
 
     def _count_tokens(self, text: str) -> int:
@@ -88,9 +92,8 @@ class TorchEmbeddingBackend(EmbeddingBackend):
     def _load_adapters(self) -> None:
         for adapter_name in EMBEDDING_ADAPTERS:
             self._model.load_adapter(
-                EMBEDDING_MODEL,
+                str(self._model_path / adapter_name),
                 adapter_name=adapter_name,
-                adapter_kwargs={"subfolder": adapter_name},
             )
 
 

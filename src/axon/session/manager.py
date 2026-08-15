@@ -15,10 +15,9 @@ from axon.ui.contracts import OPTION_KEY
 
 from axon.ingestion.ingestion_runner import IngestionRunner
 from axon.ingestion.semantic_chunker import SemanticChunker
-from axon.ingestion.pdf_parser import PdfParser
 from axon.ingestion.document_curator import DocumentCurator
 from axon.ingestion.metadata_extractor import MetadataExtractor
-from axon.ingestion.torch_embedding_backend import TorchEmbeddingBackend
+from axon.ingestion.factory import create_embedding_backend, create_pdf_parser
 
 from axon.retrieval.factory import create_reranker
 
@@ -89,9 +88,13 @@ class SessionManager:
     def _init_ingestion(self) -> None:
         self._metadata_extractor = MetadataExtractor(self._ui, self._llm_adapter)
         self._document_curator = DocumentCurator(self._ui, self._llm_adapter)
-        self._parser = PdfParser(self._document_curator, self._metadata_extractor)
+        self._parser = create_pdf_parser(
+            document_curator=self._document_curator,
+            metadata_extractor=self._metadata_extractor,
+            ui=self._ui,
+        )
         self._chunker = SemanticChunker()
-        self._embedding_backend = TorchEmbeddingBackend()
+        self._embedding_backend = create_embedding_backend(self._ui)
         self._minhasher = MinHasher()
         self._ingestion_runner = IngestionRunner(
             parser=self._parser,
@@ -104,7 +107,7 @@ class SessionManager:
         )
 
     def _init_session_services(self) -> None:
-        self._reranker = create_reranker()
+        self._reranker = create_reranker(self._ui)
 
         self._library_search_tool = LibrarySearchTool(
             embedding_backend=self._embedding_backend,
