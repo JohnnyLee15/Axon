@@ -1,5 +1,9 @@
 # Axon
 
+[![PyPI](https://img.shields.io/pypi/v/axon-ai-agent)](https://pypi.org/project/axon-ai-agent/)
+![Python](https://img.shields.io/pypi/pyversions/axon-ai-agent)
+[![License](https://img.shields.io/pypi/l/axon-ai-agent)](LICENSE)
+
 Axon is a terminal AI agent for research, knowledge retrieval, and software development. The application runs locally and keeps its PDF library, embeddings, chat database, settings, and credentials on the user's machine while using a cloud-hosted LLM for generation and analysis. Axon can answer questions with cited local sources, search the web, and use shell and file tools with explicit user permission.
 
 > Axon is currently pre-1.0. Gemini is the only supported LLM provider, and macOS on Apple silicon is the primary tested platform.
