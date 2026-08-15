@@ -24,13 +24,17 @@ def setup_provider_api_key(
             api_key = ui.request_secret(f"Enter your {provider_name} API Key").strip()
             should_save = True
 
-        validation_adapter = create_llm_adapter(
-            provider=provider,
-            ui=ui,
-            api_key=api_key,
-        )
+            if not api_key:
+                ui.error(f"The {provider_name} API key cannot be empty.")
+                api_key = None
+                continue
 
         try:
+            validation_adapter = create_llm_adapter(
+                provider=provider,
+                ui=ui,
+                api_key=api_key,
+            )
             validation_adapter.validate_credentials()
         except InvalidCredentialsError:
             ui.error(f"The {provider_name} API key is invalid.")

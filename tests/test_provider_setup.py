@@ -119,6 +119,38 @@ class ProviderSetupTests(unittest.TestCase):
 
 
     @patch(FACTORY_PATH)
+    def test_reprompts_when_entered_credential_is_empty(
+        self,
+        create_adapter: Mock,
+    ) -> None:
+        validation_adapter = Mock()
+        self._credentials.get.return_value = None
+        self._ui.request_secret.side_effect = ["   ", "valid-key"]
+        create_adapter.return_value = validation_adapter
+
+        result = setup_provider_api_key(
+            GEMINI_PROVIDER,
+            self._ui,
+            self._credentials,
+        )
+
+        self.assertEqual(result, "valid-key")
+        self.assertEqual(self._ui.request_secret.call_count, 2)
+        self._ui.error.assert_called_once_with(
+            "The Gemini API key cannot be empty."
+        )
+        create_adapter.assert_called_once_with(
+            provider=GEMINI_PROVIDER,
+            ui=self._ui,
+            api_key="valid-key",
+        )
+        self._credentials.set.assert_called_once_with(
+            key=GEMINI_API_KEY_ENV_VAR,
+            value="valid-key",
+        )
+
+
+    @patch(FACTORY_PATH)
     def test_returns_none_when_validation_fails_for_unrelated_reason(
         self,
         create_adapter: Mock,
@@ -139,6 +171,27 @@ class ProviderSetupTests(unittest.TestCase):
         self.assertIsNone(result)
         self._ui.error.assert_called_once_with(
             "Could not validate Gemini credentials: service unavailable."
+        )
+        self._credentials.set.assert_not_called()
+
+
+    @patch(FACTORY_PATH)
+    def test_returns_none_when_adapter_creation_fails(
+        self,
+        create_adapter: Mock,
+    ) -> None:
+        self._credentials.get.return_value = "stored-key"
+        create_adapter.side_effect = RuntimeError("client creation failed")
+
+        result = setup_provider_api_key(
+            GEMINI_PROVIDER,
+            self._ui,
+            self._credentials,
+        )
+
+        self.assertIsNone(result)
+        self._ui.error.assert_called_once_with(
+            "Could not validate Gemini credentials: client creation failed."
         )
         self._credentials.set.assert_not_called()
 
