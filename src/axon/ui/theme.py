@@ -1,10 +1,81 @@
+import os
+
+from blessed import Terminal
 from prompt_toolkit.styles import Style
 
 
-USER_INPUT_BACKGROUND = "#333333"
+USER_DARK_INPUT_BACKGROUND = "#333333"
+USER_LIGHT_INPUT_BACKGROUND = "#f0f0f0"
+USER_DEFAULT_INPUT_BACKGROUND = "default"
+LIGHT_ANSI_BACKGROUND_COLOURS = {7, 15}
+DARK_ANSI_BACKGROUND_COLOURS = {0, 8}
+BACKGROUND_LUMINANCE_THRESHOLD = 128
+TERMINAL_BACKGROUND_QUERY_TIMEOUT = 0.15
+UNKNOWN_TERMINAL_BACKGROUND = (-1, -1, -1)
 THEME_COLOUR = "cyan"
 PROMPT_THEME_COLOUR = f"ansi{THEME_COLOUR}"
 SYNTAX_THEME = "monokai"
+
+
+def _is_light_ansi_background(colour_hint: str | None) -> bool | None:
+    if not colour_hint:
+        return None
+
+    try:
+        background_colour = int(colour_hint.rsplit(";", maxsplit=1)[-1])
+    except ValueError:
+        return None
+
+    if background_colour in LIGHT_ANSI_BACKGROUND_COLOURS:
+        return True
+
+    if background_colour in DARK_ANSI_BACKGROUND_COLOURS:
+        return False
+
+    return None
+
+
+def _is_light_rgb_background(
+    background_colour: tuple[int, int, int],
+) -> bool | None:
+    if background_colour == UNKNOWN_TERMINAL_BACKGROUND:
+        return None
+
+    red, green, blue = background_colour
+    luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+    return luminance >= BACKGROUND_LUMINANCE_THRESHOLD
+
+
+def _is_light_terminal_background() -> bool | None:
+    try:
+        background_colour = Terminal().get_bgcolor(
+            timeout=TERMINAL_BACKGROUND_QUERY_TIMEOUT,
+            bits=8,
+        )
+    except Exception:
+        return None
+
+    return _is_light_rgb_background(background_colour)
+
+
+def get_user_input_background() -> str:
+    is_light_background = _is_light_ansi_background(
+        os.environ.get("COLORFGBG")
+    )
+
+    if is_light_background is None:
+        is_light_background = _is_light_terminal_background()
+
+    if is_light_background is True:
+        return USER_LIGHT_INPUT_BACKGROUND
+
+    if is_light_background is False:
+        return USER_DARK_INPUT_BACKGROUND
+
+    return USER_DEFAULT_INPUT_BACKGROUND
+
+
+USER_INPUT_BACKGROUND = get_user_input_background()
 
 
 class AnsiColours:
