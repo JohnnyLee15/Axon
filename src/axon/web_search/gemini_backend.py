@@ -55,8 +55,11 @@ class GeminiWebSearchBackend(WebSearchBackend):
             contents=query,
             config=types.GenerateContentConfig(
                 system_instruction=WEB_SEARCH_SYSTEM_PROMPT,
-                tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True,
+                ),
+            ),
         )
 
         return {

@@ -45,6 +45,9 @@ class GeminiAdapter(LLMAdapter):
             response_mime_type=response_mime_type,
             response_schema=response_schema,
             tools=tools,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True,
+            ),
         )
 
 

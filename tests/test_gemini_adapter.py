@@ -82,6 +82,12 @@ class GeminiAdapterGenerationTests(unittest.IsolatedAsyncioTestCase):
         self._adapter._execute_with_retries_async = AsyncMock()
         self._adapter._execute_with_retries = Mock()
 
+    def test_generate_config_disables_automatic_function_calling(self) -> None:
+        config = self._adapter._generate_config()
+
+        self.assertIsNotNone(config.automatic_function_calling)
+        self.assertTrue(config.automatic_function_calling.disable)
+
     async def test_count_tokens_uses_async_client(self) -> None:
         response = Mock(total_tokens=42)
         self._adapter._execute_with_retries_async.return_value = response
